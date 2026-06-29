@@ -11,10 +11,7 @@ The refined migration plan focuses on transitioning the Expo prototype to a robu
 *   **Utilities:** Generic utility functions or components that are purely presentational or perform calculations not tied to native modules can remain in React Native.
 
 ### Parts that should become Android native modules:
-*   **Auto-Click Engine Logic:** The core auto-clicking mechanism, including the timer and dispatching of gestures, needs to be implemented as an Android native module. This module will be responsible for interacting with the Accessibility Service.
-*   **Floating Overlay:** The draggable target and its controls, when operating over other applications, will require an Android native overlay window implementation using `SYSTEM_ALERT_WINDOW` permission.
-*   **Accessibility Service Interaction:** All interactions with the Android Accessibility Service (e.g., requesting permissions, dispatching gestures) will be handled by a native module.
-*   **Background Operation:** Logic for persistent background operation of the auto-clicker will reside in an Android native service.
+*   **AccessibilityService (Core Native Component):** As the core component, it will manage gesture dispatching, overlay management, timer execution, and permission-related behavior. This consolidates the native auto-click engine logic, floating overlay logic, and accessibility service interaction into a single, central native component.
 
 ## Key Migration Decisions
 
@@ -25,11 +22,7 @@ We should transition away from Expo Go at the **end of Phase 2: Accessibility Se
 **Expo Prebuild is the recommended long-term choice.** While the goal is a fully native Android application, Expo Prebuild offers a smoother transition from the existing Expo project. It allows us to retain the benefits of Expo tooling (e.g., development server, asset management) while gaining access to the native project for custom native module development. Migrating directly to React Native CLI would involve recreating much of the project setup that Expo already provides, leading to a more complex and time-consuming migration. Expo Prebuild allows incremental native development while still leveraging the Expo ecosystem for parts that remain in React Native.
 
 ### 3. Which Android native components should own the auto-click engine:
-The auto-click engine should primarily be owned by an **Android Native Service** that utilizes the **Accessibility Service**. This Native Service will:
-*   Manage the click interval and count.
-*   Receive commands (start/stop, update interval, target position) from the React Native UI via a Native Module.
-*   Interact directly with the Android Accessibility Service to dispatch gestures at the specified coordinates and interval.
-*   Handle background operation and ensure persistence.
+The auto-click engine should be entirely owned by the **AccessibilityService**. This service will manage gesture dispatching, overlay management, timer execution, and permission-related behavior.
 
 ### 4. Which React Native components should remain only as the UI layer:
 All existing React Native components that are primarily responsible for visual presentation and user interaction should remain as the UI layer. This includes:
@@ -62,10 +55,6 @@ android-auto-clicker/
 │   └── android/              # Native Android code for the module
 │       ├── src/
 │       └── build.gradle
-├── services/               # New directory for Android Services (e.g., AutoClickerService.kt)
-│   └── android/              # Native Android code for services
-│       ├── src/
-│       └── build.gradle
 ├── .gitignore
 ├── AGENTS.md
 ├── app.json
@@ -79,42 +68,43 @@ android-auto-clicker/
 **Phase 1: UI Prototype (Completed)**
 *   Draggable target, coordinates, position persistence, start/stop, interval controls, click feedback.
 
-**Phase 2: Accessibility Service Architecture Preparation (Current Milestone)**
-*   **Goal:** Prepare the project structure for native integration without implementing native clicking yet. Establish the communication bridge between React Native and the future native modules.
-*   **Tasks:**
-    *   Define Native Module interfaces in TypeScript for future native functionality (e.g., `startNativeClicking`, `stopNativeClicking`, `setClickInterval`, `setTargetPosition`).
-    *   Modify `useAutoClickEngine` to call these new native module methods instead of its internal JavaScript timer for actual clicks.
-    *   Introduce placeholder native module implementations (e.g., empty Kotlin files that expose the defined methods but do nothing) to allow the React Native side to be updated without breaking the app. *This step can be skipped initially if `expo prebuild` is performed early in Phase 3.* 
-
-**Phase 3: Expo Prebuild & Initial Native Module Setup**
-*   **Goal:** Generate the native Android project and set up the basic structure for custom native modules.
+**Phase 2: Expo Prebuild**
+*   **Goal:** Generate the native Android project.
 *   **Tasks:**
     *   Run `npx expo prebuild` to generate the `android/` directory.
-    *   Configure the Android project to allow for custom native modules. This may involve editing `settings.gradle` and `app/build.gradle`.
-    *   Create the `native-modules/` directory and an initial `AutoClickerModule.ts` defining the interface for the native auto-clicker functions.
-    *   Implement a basic Android Native Module (e.g., `AutoClickerModule.kt`) that corresponds to `AutoClickerModule.ts`. Initially, these native methods will be empty or log calls.
+    *   Configure the Android project for native module development.
 
-**Phase 4: Android Accessibility Service Integration**
-*   **Goal:** Implement the core Accessibility Service functionality within the native Android project.
+**Phase 3: Native Android Project Setup & Native Module Interface**
+*   **Goal:** Establish the basic structure for custom native modules and define the communication bridge.
+*   **Tasks:**
+    *   Create the `native-modules/` directory.
+    *   Create `AutoClickerModule.ts` defining the TypeScript interface for native auto-clicker functions (e.g., `startAutoClicker`, `stopAutoClicker`, `setClickInterval`, `setTargetPosition`).
+    *   Implement a basic Android Native Module (e.g., `AutoClickerModule.kt`) that corresponds to `AutoClickerModule.ts`. Initially, these native methods will act as a proxy to the `AccessibilityService`.
+    *   Modify `useAutoClickEngine` to call these new native module methods instead of its internal JavaScript timer for actual clicks.
+
+**Phase 4: AccessibilityService Implementation**
+*   **Goal:** Implement the core Accessibility Service functionality, including timer execution and initial permission handling.
 *   **Tasks:**
     *   Add necessary permissions and declarations to `AndroidManifest.xml` for `AccessibilityService`.
-    *   Create an `AutoClickerAccessibilityService.kt` that extends `AccessibilityService`.
-    *   Implement `onAccessibilityEvent` and `onInterrupt` methods.
+    *   Create `AutoClickerAccessibilityService.kt` that extends `AccessibilityService`.
+    *   Implement `onServiceConnected()`, `onAccessibilityEvent()`, `onInterrupt()`.
+    *   Implement the auto-click timer logic within `AutoClickerAccessibilityService.kt`.
     *   Develop the `dispatchGesture` logic within the `AutoClickerAccessibilityService`.
+    *   Implement permission checking and requesting for Accessibility Service within `AutoClickerAccessibilityService.kt`.
     *   Connect `AutoClickerModule.kt` to send commands (start/stop, coordinates, interval) to `AutoClickerAccessibilityService`.
 
 **Phase 5: Floating Overlay Implementation**
-*   **Goal:** Implement the draggable target and controls as a floating overlay that can appear over other applications.
+*   **Goal:** Implement the draggable target and controls as a floating overlay managed by the `AccessibilityService`.
 *   **Tasks:**
     *   Add `SYSTEM_ALERT_WINDOW` permission to `AndroidManifest.xml`.
-    *   Create a native Android service (e.g., `OverlayService.kt`) responsible for managing the floating window.
-    *   Implement the UI for the floating window in native Android (this might involve recreating a simplified version of `DraggableTarget` and `AutoClickPanel` in Android Views or Jetpack Compose, or finding a way to embed React Native components as a headles JS in the overlay, although the latter is more complex and might not be feasible).
-    *   Establish communication between the `OverlayService` and the React Native UI to update target position and receive commands.
+    *   Implement the floating window management within `AutoClickerAccessibilityService.kt`.
+    *   Create the UI for the floating window using native Android Views or Jetpack Compose.
+    *   Implement drag functionality for the overlay, communicating position changes within the `AccessibilityService`.
 
-**Phase 6: Full Android Auto Clicker**
-*   **Goal:** Integrate all components to achieve a functional, real Android Auto Clicker.
+**Phase 6: Real Auto-Click Implementation & Refinement**
+*   **Goal:** Integrate all components to achieve a functional, real Android Auto Clicker with robust error handling and performance.
 *   **Tasks:**
-    *   Refine communication between React Native UI, Native Modules, Accessibility Service, and Floating Overlay.
+    *   Refine communication between React Native UI, Native Module, and `AccessibilityService`.
     *   Implement robust error handling and permission request flows.
     *   Thoroughly test all functionalities across different Android versions and devices.
     *   Optimize performance and resource usage.

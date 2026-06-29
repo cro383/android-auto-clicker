@@ -32,39 +32,40 @@ To utilize an `AccessibilityService`, the following declarations are required in
     ```xml
     <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
         android:description="@string/accessibility_service_description"
-        android:packageNames="com.example.androidautoclicker"  <!-- Or target all apps if needed -->
         android:accessibilityEventTypes="typeAllMask"
-        android:accessibilityFlags="flagRequestFilterKeyEvents|flagReportViewIds|flagRequestTouchExplorationMode"
+        android:accessibilityFlags="flagReportViewIds|flagRequestTouchExplorationMode"
         android:accessibilityFeedbackType="feedbackGeneric"
         android:notificationTimeout="100"
         android:canRetrieveWindowContent="true"
-        android:canPerformGestures="true"
-        android:settingsActivity="com.example.androidautoclicker.SettingsActivity" />
+        android:canPerformGestures="true" />
     ```
     *   `android:canPerformGestures="true"` is critical for `dispatchGesture()`.
-    *   `android:packageNames` can be configured to target specific applications or left out to target all applications.
+    *   `android:packageNames` should *not* be specified, allowing the service to interact with all applications.
+    *   Unnecessary flags like `flagRequestFilterKeyEvents` and `flagRequestTouchExplorationMode` have been removed unless strictly required for future features.
 
-### 2. `AutoClickerAccessibilityService.kt`
-This Kotlin class will extend `AccessibilityService` and implement its lifecycle methods and gesture dispatching logic.
+### 2. `AutoClickerAccessibilityService.kt` (Core Native Component)
+This Kotlin class will extend `AccessibilityService` and implement its lifecycle methods, gesture dispatching, timer execution, overlay management, and permission handling.
 
-*   **`onServiceConnected()`:** Called when the system successfully connects to the Accessibility Service. This is where initial setup and configuration can be done.
+*   **`onServiceConnected()`:** Called when the system successfully connects to the Accessibility Service. This is where initial setup, timer initialization, and overlay setup can be done.
     ```kotlin
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.d(TAG, "Accessibility Service Connected")
         val serviceInfo = AccessibilityServiceInfo()
-        serviceInfo.flags = AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS or
-                             AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
-                             AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE
+        serviceInfo.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
         serviceInfo.eventTypes = AccessibilityEvent.TYPES_ALL_MASK
         serviceInfo.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
         serviceInfo.notificationTimeout = 100
-        serviceInfo.packageNames = arrayOf("com.example.androidautoclicker") // Or null for all
+        // serviceInfo.packageNames = null // Allow all packages
         this.serviceInfo = serviceInfo
+
+        // Initialize timer and overlay here
+        initializeOverlay()
+        initializeTimer()
     }
     ```
 
-*   **`onAccessibilityEvent(event: AccessibilityEvent?)`:** This method is called when an accessibility event occurs. While not directly used for *dispatching* gestures, it can be used for monitoring or reacting to events if future features require it.
+*   **`onAccessibilityEvent(event: AccessibilityEvent?)`:** This method is called when an accessibility event occurs. It can be used for monitoring or reacting to events if future features require it, but not for dispatching gestures.
     ```kotlin
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // Log or handle accessibility events if necessary
@@ -72,14 +73,16 @@ This Kotlin class will extend `AccessibilityService` and implement its lifecycle
     }
     ```
 
-*   **`onInterrupt()`:** Called when the system interrupts the service (e.g., another accessibility service is enabled).
+*   **`onInterrupt()`:** Called when the system interrupts the service (e.g., another accessibility service is enabled). This is where cleanup and state saving should occur.
     ```kotlin
     override fun onInterrupt() {
         Log.d(TAG, "Accessibility Service Interrupted")
+        stopTimer()
+        removeOverlay()
     }
     ```
 
-*   **`dispatchClickGesture(x: Int, y: Int)`:** This custom method will be called by `AutoClickerService.kt` to perform a simulated click.
+*   **`dispatchClickGesture(x: Int, y: Int)`:** This method will perform a simulated click at the given coordinates.
     ```kotlin
     fun dispatchClickGesture(x: Int, y: Int) {
         val path = Path()
@@ -104,25 +107,121 @@ This Kotlin class will extend `AccessibilityService` and implement its lifecycle
     }
     ```
 
-### 3. Permission Request Flow (React Native / Native Module)
-Users must explicitly grant Accessibility Service permission. The application will need a mechanism to check for and request this permission.
+*   **Timer Execution:** The `AccessibilityService` will manage a timer (e.g., `Handler` and `Runnable` or `ScheduledExecutorService`) to periodically call `dispatchClickGesture()`.
+    ```kotlin
+    private var clickHandler: Handler? = null
+    private var clickRunnable: Runnable? = null
+    private var clickInterval: Long = 1000 // Default to 1 second
+    private var targetX: Int = 0
+    private var targetY: Int = 0
 
-*   **Check Permission:**
-    *   Native module will expose a method to check if the Accessibility Service is enabled.
-    *   This typically involves checking `Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)` and `TextUtils.SimpleStringSplitter.split()` to see if the service's component name is present.
+    private fun initializeTimer() {
+        clickHandler = Handler(Looper.getMainLooper())
+        clickRunnable = object : Runnable {
+            override fun run() {
+                dispatchClickGesture(targetX, targetY)
+                clickHandler?.postDelayed(this, clickInterval)
+            }
+        }
+    }
 
-*   **Request Permission:**
-    *   If the service is not enabled, the native module will open the Accessibility Settings screen for the user.
-    *   ```kotlin
+    fun startAutoClicker(x: Int, y: Int, interval: Long) {
+        targetX = x
+        targetY = y
+        clickInterval = interval
+        stopTimer() // Ensure any existing timer is stopped
+        clickHandler?.post(clickRunnable!!)
+        Log.d(TAG, "Auto Clicker Started at ($targetX, $targetY) with interval $clickInterval")
+    }
+
+    fun stopAutoClicker() {
+        clickHandler?.removeCallbacks(clickRunnable!!)
+        Log.d(TAG, "Auto Clicker Stopped")
+    }
+
+    private fun stopTimer() {
+        clickHandler?.removeCallbacks(clickRunnable!!)
+    }
+    ```
+
+*   **Overlay Management:** The `AccessibilityService` will also handle the creation, display, and interaction of the floating overlay. (Detailed in `OVERLAY_DESIGN.md`).
+
+*   **Permission Management:** The `AccessibilityService` will contain methods to check and request `SYSTEM_ALERT_WINDOW` permission, and guide the user to enable the Accessibility Service itself.
+    ```kotlin
+    fun isAccessibilityServiceEnabled(): Boolean {
+        val accessibilityManager = getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        val enabledServices = accessibilityManager.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+        for (service in enabledServices) {
+            if (service.id == componentName.flattenToString()) {
+                return true
+            }
+        }
+        return false
+    }
+
+    fun requestAccessibilityServicePermission() {
         val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(intent)
-        ```
+    }
+    ```
 
-## Communication with `AutoClickerService.kt`
-`AutoClickerAccessibilityService.kt` will expose a method (e.g., `dispatchClickGesture`) that `AutoClickerService.kt` can call to trigger simulated clicks. This communication can be established using a bound service or local broadcast receivers, with a bound service being preferable for direct method calls.
+### 3. Communication with React Native (via Native Module)
+React Native will communicate with the `AccessibilityService` indirectly through a Native Module (e.g., `AutoClickerModule.kt`). This module will expose methods to React Native that, in turn, call methods on the running `AccessibilityService` instance.
+
+*   **`AutoClickerModule.kt` (Simplified Proxy):
+    ```kotlin
+    class AutoClickerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+
+        override fun getName() = "AutoClickerModule"
+
+        @ReactMethod
+        fun start(x: Int, y: Int, interval: Int) {
+            val accessibilityService = // Get running instance of AutoClickerAccessibilityService
+            accessibilityService?.startAutoClicker(x, y, interval.toLong())
+        }
+
+        @ReactMethod
+        fun stop() {
+            val accessibilityService = // Get running instance of AutoClickerAccessibilityService
+            accessibilityService?.stopAutoClicker()
+        }
+
+        @ReactMethod
+        fun setTargetPosition(x: Int, y: Int) {
+            val accessibilityService = // Get running instance of AutoClickerAccessibilityService
+            accessibilityService?.updateTargetPosition(x, y)
+        }
+
+        // Methods to check/request permissions
+        @ReactMethod
+        fun checkAccessibilityPermission(promise: Promise) {
+            val accessibilityService = // Get running instance of AutoClickerAccessibilityService
+            promise.resolve(accessibilityService?.isAccessibilityServiceEnabled() ?: false)
+        }
+
+        @ReactMethod
+        fun requestAccessibilityPermission() {
+            val accessibilityService = // Get running instance of AutoClickerAccessibilityService
+            accessibilityService?.requestAccessibilityServicePermission()
+        }
+
+        @ReactMethod
+        fun checkOverlayPermission(promise: Promise) {
+            promise.resolve(Settings.canDrawOverlays(reactApplicationContext))
+        }
+
+        @ReactMethod
+        fun requestOverlayPermission() {
+            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + reactApplicationContext.packageName))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            reactApplicationContext.startActivity(intent)
+        }
+    }
+    ```
+    *   **Note:** Obtaining the running `AccessibilityService` instance from a Native Module requires careful implementation (e.g., using a singleton pattern or a broadcast/event bus within the native layer).
 
 ## Error Handling and Edge Cases
-*   **Permission Denied:** The application must gracefully handle cases where the user denies Accessibility Service permission, providing clear instructions on how to enable it.
-*   **Service Interrupted:** The `onInterrupt()` callback can be used to notify the `AutoClickerService.kt` or React Native UI that the service has been interrupted, allowing for appropriate action (e.g., pausing auto-clicking).
-*   **API Level Compatibility:** `dispatchGesture()` was introduced in API Level 24 (Android 7.0 - Nougat). Older Android versions will require alternative approaches if support is needed (though the project currently targets Android only and Expo SDK 54 likely implies newer API levels).
+*   **Permission Denied:** The application must gracefully handle cases where the user denies Accessibility Service or `SYSTEM_ALERT_WINDOW` permissions.
+*   **Service Interrupted:** The `onInterrupt()` callback will stop the timer and remove the overlay.
+*   **API Level Compatibility:** `dispatchGesture()` requires API Level 24+.

@@ -20,7 +20,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.cro383.myfirstapp"
+      "package": "com.cro383.autoclicker"
     },
     "web": {
       "output": "static",
