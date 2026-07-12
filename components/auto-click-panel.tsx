@@ -37,7 +37,7 @@ export function AutoClickPanel({
           ]}
           onPress={decreaseInterval}
           disabled={isRunning || atMinInterval}>
-          <Text style={styles.intervalButtonText}>−</Text>
+          <Text style={styles.intervalButtonText}>-</Text>
         </Pressable>
         <Pressable
           style={[

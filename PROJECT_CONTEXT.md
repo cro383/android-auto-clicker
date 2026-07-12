@@ -1,489 +1,351 @@
-# PROJECT_CONTEXT.md
-
 # Android Auto Clicker Project Context
 
 ## Project Overview
 
-This project is an Android-only Auto Clicker built with:
+This repository is an Android-only Auto Clicker project.
 
-* React Native
-* Expo SDK 54
-* Expo Router
-* TypeScript
-* React Native Reanimated
-* React Native Gesture Handler
+The current app is built with:
 
-Current development IDE:
-
-* VS Code
-* Cline AI
-* Google Gemini (gemini-2.5-flash)
+- Expo SDK 54
+- React Native 0.81
+- React 19
+- Expo Router
+- TypeScript
+- React Native Reanimated
+- React Native Gesture Handler
+- AsyncStorage
+- Kotlin native Android module placeholders
 
 Target platform:
 
-* Android only
-* iOS support is NOT required
+- Android only
+- iOS support is not required
 
-The current project is an in-app prototype.
+The current product state is an in-app prototype. The final goal is a real Android Auto Clicker that works over other Android apps through Android Accessibility Service and native Android overlay code.
 
-The final goal is to build a real Android Auto Clicker using Android Accessibility Service.
+There is also a browser demonstration mode for presentations. The web demo is only a simulation of the UI and click feedback. It does not perform real Android taps.
 
----
+## Development Environment
 
-# Development Environment
+Primary project path:
 
-## A Computer (Primary)
-
-Project Path
-
+```text
 E:\Projects\my-first-app
+```
 
-IDE
+Secondary project path:
 
-VS Code
-
----
-
-## B Computer (Secondary)
-
-Project Path
-
+```text
 D:\Projects\android-auto-clicker
+```
 
-IDE
+Expected environment:
 
-VS Code
+- Windows
+- Node.js v24.x
+- npm / npx
+- Git
+- VS Code
+- Android device or emulator
 
-Purpose
+GitHub repository:
 
-Backup and secondary development.
-
----
-
-Environment
-
-* Windows
-* Node.js v24.x
-* npm / npx installed
-* Git installed
-* Expo Go on a real Android device
-
----
-
-# Repository
-
-GitHub Repository
-
+```text
 https://github.com/cro383/android-auto-clicker
+```
 
-Git is the single source of truth.
+Git is the single source of truth. When switching computers, pull the latest changes, install dependencies if needed, start Expo with a clean cache, and test on Android.
 
-When switching computers:
+## Expo SDK 54 Notes
 
-1. git pull
-2. npm install (if needed)
-3. npx expo start --clear
-4. Test using Expo Go
+Before writing code, read the exact versioned Expo docs:
 
-Commit after every completed feature.
+```text
+https://docs.expo.dev/versions/v54.0.0/
+```
 
----
+Important SDK 54 baseline from the docs:
 
-# Main Goal
+- Expo SDK 54 targets React Native 0.81.
+- Expo SDK 54 targets React 19.1.
+- Minimum Node.js version is 20.19.x.
+- Android compile SDK is 36.
+- Android target SDK is 36.
 
-Create a real Android Auto Clicker with:
+This project currently uses Expo `~54.0.34`, React Native `0.81.5`, and React `19.1.0`.
+
+## Main Goal
+
+Build a real Android Auto Clicker with:
 
 1. Draggable target
 2. Auto click engine
 3. Adjustable click interval
 4. Floating overlay
-5. Clicking inside other Android apps
+5. Tapping inside other Android apps
 6. Background operation
 
-Current work focuses only on the in-app prototype.
+The final implementation must use native Android APIs:
 
----
+- Accessibility Service
+- `dispatchGesture()`
+- Overlay Window
+- Kotlin native code
 
-# Current Architecture
+## Current Architecture
+
+Main screen:
+
+- `app/(tabs)/index.tsx`
+
+Main UI components:
+
+- `components/draggable-target.tsx`
+- `components/auto-click-panel.tsx`
+- `components/click-ripple.tsx`
+- `components/web-demo-auto-clicker.tsx`
+
+Main state hook:
+
+- `hooks/use-auto-click-engine.ts`
+
+Storage:
+
+- `lib/target-position-storage.ts`
+- AsyncStorage key: `auto-clicker/target-position`
+
+Native Android placeholders:
+
+- `android/app/src/main/java/com/cro383/autoclicker/AutoClickerModule.kt`
+- `android/app/src/main/java/com/cro383/autoclicker/AutoClickerPackage.kt`
+
+Current flow:
+
+```text
+Home Screen
+-> AutoClickPanel
+-> useAutoClickEngine
+-> clickCount / interval / running state
 
 Home Screen
+-> DraggableTarget
+-> AsyncStorage target position
+-> ClickRipple visual feedback
+```
 
-app/(tabs)/index.tsx
+## Current Implemented Features
 
-Main Components
+### Draggable Target
 
-* DraggableTarget
-* AutoClickPanel
-* ClickRipple
+Status: complete for in-app prototype.
 
-Main Hook
+- Red circular target
+- Size: 80 x 80
+- Smooth dragging
+- Gesture Handler based pan gesture
+- Reanimated shared values
+- Constrained to screen bounds
 
-* useAutoClickEngine
+### Coordinate Display
 
-Storage
+Status: complete.
 
-* AsyncStorage
+- Shows real-time X coordinate
+- Shows real-time Y coordinate
+- Coordinates represent the top-left corner of the target
+- Target center is `x + 40`, `y + 40`
 
-Architecture
+### Target Position Persistence
 
-Home Screen
+Status: complete.
 
-↓
+- Saves target position automatically
+- Restores position after restart
+- Persists across app launches
+- Clamps saved position inside current screen bounds
 
-Draggable Target
+### Auto Click Engine
 
-↓
+Status: complete for simulation only.
 
-Auto Click Engine
+- Start
+- Stop
+- Running state
+- Click count
+- JavaScript timer
 
-↓
+Important limitation:
 
-Visual Click Feedback
+- It does not perform real Android taps yet.
 
-↓
+### Interval Controls
 
-AsyncStorage
+Status: complete for in-app prototype.
 
----
+- Default interval: `1000 ms`
+- Minimum interval: `100 ms`
+- Maximum interval: `5000 ms`
+- Step: `100 ms`
+- Interval buttons are disabled while running
 
-# Completed Features
+### Visual Click Feedback
 
-## 1. Draggable Target
+Status: complete.
 
-Status
+- White ripple animation
+- Ripple appears at the captured click position
+- Ripple expands and fades
+- Ripple is intentionally not attached to the draggable target after the click point is captured
 
-Complete
+### Web Demonstration Mode
 
-Features
+Status: complete for browser presentation.
 
-* Red circular target
-* Size: 80 × 80
-* Smooth dragging
-* Uses Gesture Handler
-* Uses Reanimated
-* Constrained to screen bounds
+- Runs through `npm run web`
+- Uses the existing auto click engine state
+- Provides mouse-drag target movement
+- Shows click count, interval, running state, and ripple feedback
+- Does not use Accessibility Service, overlay windows, or native Android clicking
 
----
+## Known Issues
 
-## 2. Coordinate Display
+- Some older documentation files contained broken encoding artifacts and stale roadmap details.
+- Native Android module methods currently only log placeholder messages.
+- Real Android clicking is not implemented yet.
 
-Status
+## Current Project Status
 
-Complete
+Current phase:
 
-Features
+```text
+In-app UI prototype with native module placeholders
+```
 
-* Real-time X coordinate
-* Real-time Y coordinate
+The in-app prototype should be preserved while native Android functionality is added incrementally.
 
-Coordinates represent
+## Important Design Decisions
 
-Top-left corner of the target.
+### Android Only
 
-Target center
+Do not spend effort on iOS unless explicitly requested.
 
-Center X = X + 40
+### Prototype vs Real Clicker
 
-Center Y = Y + 40
+The current React Native UI simulates clicking inside the app. It is useful for target positioning, interval control, and UX validation.
 
----
+Real clicking outside the app must move to native Android code.
 
-## 3. Target Position Persistence
+### Native Ownership
 
-Status
+The native Android layer should eventually own:
 
-Complete
+- Accessibility permission checks
+- Overlay permission checks
+- Floating overlay lifecycle
+- Target position used for real taps
+- Timer for real auto clicking
+- `dispatchGesture()` calls
 
-Storage
+React Native should remain the configuration and control UI.
 
-AsyncStorage
+## Roadmap
 
-Behavior
+### Phase 1: In-App UI Prototype
 
-* Automatically saves position
-* Restores after restart
-* Persists across app launches
-* Safely clamps inside screen bounds
+Status: completed.
 
-Storage Key
+Includes:
 
-auto-clicker/target-position
+- Draggable target
+- Coordinate display
+- Position persistence
+- Start / Stop controls
+- Interval controls
+- Click count
+- Ripple feedback
 
----
+### Phase 2: Clean Current Prototype
 
-## 4. Auto Click Engine
+Status: next.
 
-Status
+Recommended tasks:
 
-Complete
+- Fix corrupted text in `AutoClickPanel`
+- Verify current Android build
+- Confirm native module registration
+- Keep all existing UI behavior working
 
-Features
+### Phase 3: Native Module Contract
 
-* Start
-* Stop
-* Running state
-* Click Count
+Goal:
 
-Behavior
+- Define a stable TypeScript-to-Kotlin API.
 
-* Click Count increases automatically
-* Dragging remains smooth while running
-* JavaScript timer only
-* No real Android click yet
+Expected native calls:
 
----
+- `start`
+- `stop`
+- `setInterval`
+- `setTargetPosition`
+- Permission check methods
+- Permission request methods
 
-## 5. Interval Controls
+### Phase 4: Accessibility Service
 
-Status
+Goal:
 
-Complete
+- Add and register an Android Accessibility Service.
+- Implement service lifecycle.
+- Add permission guidance.
+- Do not add risky click automation until service wiring is verified.
 
-Default
+### Phase 5: Real Gesture Dispatch
 
-1000 ms
+Goal:
 
-Controls
+- Implement real tap gestures through `dispatchGesture()`.
+- Move real click timer into native Android code.
 
-* Minus
-* Plus
+### Phase 6: Floating Overlay
 
-Rules
+Goal:
 
-* Minus = -100 ms
-* Plus = +100 ms
+- Add an Android overlay target using `WindowManager`.
+- Request and validate overlay permission.
+- Allow dragging target over other apps.
 
-Limits
+### Phase 7: Complete Real Android Auto Clicker
 
-* Minimum = 100 ms
-* Maximum = 5000 ms
+Goal:
 
-Behavior
+- Combine React Native UI, native module, Accessibility Service, real gesture dispatch, overlay, and robust permission handling.
 
-Selected interval is applied when Start is pressed.
+## Development Principles
 
----
+- Build incrementally.
+- Preserve existing working functionality.
+- Prefer editing existing files.
+- Avoid unnecessary refactoring.
+- Keep implementations simple.
+- Test after every feature.
+- Keep Android as the only supported platform.
+- Do not implement large architectural changes without user approval.
 
-## 6. Visual Click Feedback
+## Notes For Future AI Sessions
 
-Status
+Before making code changes:
 
-Complete
-
-Purpose
-
-Show exactly where the simulated click occurred.
-
-Implementation
-
-* White ripple animation
-* Appears at the click position
-* Expands outward
-* Quickly fades away
-
-Important Design Decision
-
-The ripple is NOT attached to the red target.
-
-Instead:
-
-* Click position is captured
-* Ripple is created at that location
-* Ripple stays there
-* Dragging immediately afterward does not move the ripple
-
-This accurately represents the click location.
-
----
-
-# Verified Working Features
-
-Successfully tested on a real Android device.
-
-✓ Drag target
-
-✓ Coordinate updates
-
-✓ Screen boundary limits
-
-✓ Start button
-
-✓ Stop button
-
-✓ Click Count
-
-✓ Interval controls
-
-✓ Position persistence
-
-✓ Ripple animation
-
-✓ Dragging while auto-clicking
-
----
-
-# Current Project Status
-
-Current phase
-
-UI Prototype
-
-Everything currently implemented is stable.
-
-No known bugs.
-
----
-
-# Important Design Decisions
-
-## Android Only
-
-This project targets Android only.
-
-Do not spend development effort on iOS unless explicitly requested.
-
----
-
-## Expo Go Limitations
-
-Current project still runs in Expo Go.
-
-Therefore:
-
-* No Accessibility Service
-* No Overlay Window
-* No Native Module
-* No Real Android Clicking
-
-These will be implemented after moving beyond Expo Go.
-
----
-
-## Future Native Architecture
-
-React Native
-
-↓
-
-Native Module
-
-↓
-
-Accessibility Service
-
-↓
-
-dispatchGesture()
-
-↓
-
-Real Android Click
-
----
-
-# Future Roadmap
-
-## Phase 1
-
-UI Prototype
-
-Status
-
-Completed
-
-Includes
-
-* Draggable target
-* Coordinates
-* Position persistence
-* Start / Stop
-* Interval controls
-* Click feedback
-
----
-
-## Phase 2
-
-Accessibility Service Architecture
-
-Next milestone.
-
-Prepare project structure.
-
-Do NOT implement native clicking yet.
-
----
-
-## Phase 3
-
-Expo Prebuild
-
-Generate Android native project.
-
----
-
-## Phase 4
-
-React Native ↔ Kotlin Native Module
-
-Bridge communication.
-
----
-
-## Phase 5
-
-Android Accessibility Service
-
-Implement dispatchGesture().
-
----
-
-## Phase 6
-
-Floating Overlay
-
-Display draggable target over other Android apps.
-
----
-
-## Phase 7
-
-Real Android Auto Clicker
-
-Complete Android implementation.
-
----
-
-# Development Principles
-
-* Build incrementally.
-* Preserve existing functionality.
-* Prefer editing existing files.
-* Avoid unnecessary refactoring.
-* Keep implementations simple.
-* Test after every feature.
-* Android only.
-
----
-
-# Notes For Future AI Sessions
-
-Before making any code changes:
-
-1. Read PROJECT_CONTEXT.md completely.
-2. Read AGENTS.md.
-3. Understand the current architecture.
+1. Read this file completely.
+2. Read `AGENTS.md`.
+3. Read the Expo SDK 54 docs.
 4. Inspect the existing project.
 5. Explain the implementation plan.
 6. Wait for user approval before modifying files.
-7. Preserve all completed functionality.
-8. Keep Android as the only supported platform.
 
-After completing changes:
+After completing changes, always report:
 
-* Summarize modified files.
-* Explain why changes were made.
-* Describe what should be tested.
-* Mention any potential risks.
-
-Current project state is considered stable and functional.
+- Files modified
+- Summary
+- Reason
+- Testing
+- Risks

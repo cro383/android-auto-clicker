@@ -44,7 +44,6 @@ export function ClickRipple({ pulse, x, y }: ClickRippleProps) {
 
   return (
     <Animated.View
-      pointerEvents="none"
       style={[
         styles.ring,
         {
@@ -63,6 +62,7 @@ export function ClickRipple({ pulse, x, y }: ClickRippleProps) {
 const styles = StyleSheet.create({
   ring: {
     position: 'absolute',
+    pointerEvents: 'none',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.45)',
     backgroundColor: 'transparent',

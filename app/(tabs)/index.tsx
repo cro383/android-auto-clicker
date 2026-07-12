@@ -1,11 +1,16 @@
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { AutoClickPanel } from '@/components/auto-click-panel';
 import { DraggableTarget } from '@/components/draggable-target';
+import { WebDemoAutoClicker } from '@/components/web-demo-auto-clicker';
 import { useAutoClickEngine } from '@/hooks/use-auto-click-engine';
 
 export default function HomeScreen() {
   const engine = useAutoClickEngine();
+
+  if (Platform.OS === 'web') {
+    return <WebDemoAutoClicker {...engine} />;
+  }
 
   return (
     <View style={styles.screen}>

@@ -1,60 +1,161 @@
-# Architecture Document
+# Architecture
 
 ## Overview
-The current project is an Expo prototype of an Android Auto Clicker. This document outlines the proposed final architecture after migrating to a standalone Android native application. The goal is to build a real Android Auto Clicker leveraging Android Accessibility Service, a floating overlay, native Android services, `SYSTEM_ALERT_WINDOW`, accessibility gestures, and background operation.
 
-## Final Architecture Diagram
+This project is an Android-only Auto Clicker. The current app is an in-app React Native prototype with Android native module placeholders. The final architecture should keep React Native focused on configuration UI while moving real clicking, overlay behavior, and permission-sensitive work into native Android code.
 
-```mermaid
-graph TD
-    RN_UI[React Native UI]
-    NM_Interface[Native Module Interface]
-    ACCESSIBILITY_SERVICE[AccessibilityService]
-    
-    subgraph AccessibilityService
-        OVERLAY[Overlay]
-        TIMER[Timer]
-        DISPATCH_GESTURE[dispatchGesture()]
-        PERMISSION_MANAGEMENT[Permission Management]
-    end
+## Current Runtime Architecture
 
-    RN_UI -- Calls --> NM_Interface
-    NM_Interface -- Implemented by --> ACCESSIBILITY_SERVICE
-    ACCESSIBILITY_SERVICE -- Controls --> OVERLAY
-    ACCESSIBILITY_SERVICE -- Manages --> TIMER
-    ACCESSIBILITY_SERVICE -- Executes --> DISPATCH_GESTURE
-    ACCESSIBILITY_SERVICE -- Handles --> PERMISSION_MANAGEMENT
+```text
+app/(tabs)/index.tsx
+-> AutoClickPanel
+-> useAutoClickEngine
+-> JavaScript interval
+-> clickCount
 
-    style ACCESSIBILITY_SERVICE fill:#f9f,stroke:#333,stroke-width:2px
-    style OVERLAY fill:#ccf,stroke:#333,stroke-width:2px
-    style TIMER fill:#ccf,stroke:#333,stroke-width:2px
-    style DISPATCH_GESTURE fill:#ccf,stroke:#333,stroke-width:2px
-    style PERMISSION_MANAGEMENT fill:#ccf,stroke:#333,stroke-width:2px
-
+app/(tabs)/index.tsx
+-> DraggableTarget
+-> Gesture Handler / Reanimated
+-> AsyncStorage position persistence
+-> ClickRipple visual feedback
 ```
 
-## Component Breakdown
+Current native files:
 
-### React Native UI Layer
-*   **Purpose:** Provides the user interface for configuring and controlling the auto-clicker. This layer is responsible for displaying the draggable target, auto-click controls (start/stop, interval), and visual click feedback.
-*   **Key Components:**
-    *   `app/(tabs)/index.tsx`: The main home screen.
-    *   `components/draggable-target.tsx`: Handles the visual representation and basic dragging logic of the target *within the app*.
-    *   `components/auto-click-panel.tsx`: Contains the controls for initiating/stopping auto-clicking and adjusting the click interval.
-    *   `components/click-ripple.tsx`: Provides visual feedback for simulated clicks.
-    *   `hooks/use-auto-click-engine.ts`: Manages the state of the auto-clicker within the React Native UI (e.g., `isRunning`, `clickCount`, `interval`). It will communicate with the native layer to trigger actual clicks.
-    *   **Responsibilities:** Start/Stop buttons, Interval controls, Target position, Status display, Coordinate display.
+- `AutoClickerModule.kt` exposes placeholder methods to React Native.
+- `AutoClickerPackage.kt` registers the native module package.
+- `AndroidManifest.xml` already includes `SYSTEM_ALERT_WINDOW`, but no overlay implementation exists yet.
 
-### Native Module Interface (TypeScript)
-*   **Purpose:** Defines the contract for communication between the React Native JavaScript layer and the underlying Android native modules. This ensures type safety and a clear API for native functionality.
-*   **Example:** `native-modules/AutoClickerModule.ts` will declare functions like `startAutoClicker`, `stopAutoClicker`, `setClickInterval`, `setTargetPosition`.
+## Current Layer Responsibilities
 
-### AccessibilityService (Core Native Component)
-*   **Purpose:** The central native component responsible for all core auto-clicking functionality, including gesture dispatching, overlay management, timer execution, and permission handling.
-*   **Key Responsibilities:**
-    *   **Gesture Dispatching:** Executes `dispatchGesture()` to perform simulated clicks at specified coordinates.
-    *   **Overlay Management:** Creates, manages, and updates the floating overlay window that displays the draggable target and controls over other applications. This includes handling `SYSTEM_ALERT_WINDOW` permission.
-    *   **Timer Execution:** Manages the auto-click timer to trigger clicks at the defined interval. This replaces the JavaScript-based timer.
-    *   **Permission Management:** Handles checking for and requesting necessary permissions, particularly Accessibility Service and `SYSTEM_ALERT_WINDOW`.
-    *   Receives commands from React Native (e.g., start/stop auto-clicking, update interval, target coordinates) via the Native Module.
-    *   Provides state updates back to React Native.
+### React Native UI
+
+Files:
+
+- `app/(tabs)/index.tsx`
+- `components/draggable-target.tsx`
+- `components/auto-click-panel.tsx`
+- `components/click-ripple.tsx`
+
+Responsibilities:
+
+- Show the auto clicker control screen
+- Display target coordinates
+- Allow in-app target dragging
+- Show Start / Stop state
+- Show and change interval
+- Show simulated click feedback
+
+### React Native State
+
+File:
+
+- `hooks/use-auto-click-engine.ts`
+
+Responsibilities:
+
+- Track running state
+- Track click count
+- Track selected interval
+- Run the current simulation timer
+
+Limitation:
+
+- This hook does not perform real Android clicks.
+
+### Storage
+
+File:
+
+- `lib/target-position-storage.ts`
+
+Responsibilities:
+
+- Load target position from AsyncStorage
+- Save target position to AsyncStorage
+- Clamp target position to visible bounds
+
+### Native Android Placeholder
+
+Files:
+
+- `android/app/src/main/java/com/cro383/autoclicker/AutoClickerModule.kt`
+- `android/app/src/main/java/com/cro383/autoclicker/AutoClickerPackage.kt`
+
+Responsibilities today:
+
+- Register a React Native native module
+- Provide placeholder methods for start, stop, interval, and target position
+
+Responsibilities later:
+
+- Bridge React Native commands to the Accessibility Service
+- Expose permission checks and permission request entry points
+- Send native state updates back to React Native if needed
+
+## Target Native Architecture
+
+```text
+React Native UI
+-> TypeScript native module wrapper
+-> Kotlin AutoClickerModule
+-> AutoClickerAccessibilityService
+-> Native timer
+-> dispatchGesture()
+-> Real Android tap
+
+AutoClickerAccessibilityService
+-> WindowManager overlay
+-> Draggable native target
+-> Overlay permission handling
+-> Accessibility permission handling
+```
+
+## Final Native Responsibilities
+
+### Kotlin Native Module
+
+The native module should be a thin bridge. It should not own the click loop long term.
+
+Expected responsibilities:
+
+- `start`
+- `stop`
+- `setInterval`
+- `setTargetPosition`
+- `checkAccessibilityPermission`
+- `requestAccessibilityPermission`
+- `checkOverlayPermission`
+- `requestOverlayPermission`
+
+### Accessibility Service
+
+The Accessibility Service should own the real auto clicker engine.
+
+Expected responsibilities:
+
+- Maintain service lifecycle
+- Store active target coordinates
+- Store active click interval
+- Start and stop native click timer
+- Call `dispatchGesture()`
+- Clean up on interruption or service destruction
+
+### Floating Overlay
+
+The overlay should be native Android UI managed through `WindowManager`.
+
+Expected responsibilities:
+
+- Show the target over other apps
+- Allow target dragging outside the React Native app
+- Update target coordinates in native state
+- Respect overlay permission and lifecycle
+
+## Design Rules
+
+- Preserve the current in-app prototype while adding native features.
+- Keep React Native as the control/configuration layer.
+- Keep real clicking inside the Accessibility Service.
+- Do not implement large native architecture changes without approval.
+- Add native behavior incrementally and verify each step on Android.
