@@ -54,6 +54,8 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     private var overlayLayoutParams: WindowManager.LayoutParams? = null
     private var controlView: TextView? = null
     private var controlLayoutParams: WindowManager.LayoutParams? = null
+    private var moveHandleView: TextView? = null
+    private var moveHandleLayoutParams: WindowManager.LayoutParams? = null
     private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
     private val overlaySizePx by lazy { (80 * resources.displayMetrics.density).toInt() }
 
@@ -84,7 +86,8 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
             showOverlayInternal()
             isRunning = true
-            setOverlayTouchable(true)
+            setOverlayTouchable(false)
+            showMoveHandleInternal()
             updateControlButton()
             notifyStateChanged()
             clickHandler.post(clickRunnable)
@@ -135,6 +138,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     private fun stopAutoClickerInternal() {
         isRunning = false
         clickHandler.removeCallbacks(clickRunnable)
+        hideMoveHandleInternal()
         setOverlayTouchable(true)
         updateControlButton()
         notifyStateChanged()
@@ -153,6 +157,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
                 params.y = targetY - overlaySizePx / 2
                 clampOverlayPosition(params)
                 windowManager.updateViewLayout(view, params)
+                updateMoveHandlePosition()
             }
         }
 
@@ -260,6 +265,142 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         windowManager.updateViewLayout(view, params)
     }
 
+    private fun showMoveHandleInternal() {
+        if (moveHandleView != null || !isRunning) {
+            return
+        }
+
+        val handle = TextView(this).apply {
+            text = "MOVE"
+            setTextColor(Color.WHITE)
+            textSize = 11f
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                setColor(Color.rgb(37, 99, 235))
+                setStroke(dp(1), Color.WHITE)
+            }
+        }
+        val params = WindowManager.LayoutParams(
+            dp(56),
+            dp(36),
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                WindowManager.LayoutParams.TYPE_PHONE
+            },
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+        }
+
+        attachMoveHandleListener(handle, params)
+        moveHandleView = handle
+        moveHandleLayoutParams = params
+        updateMoveHandlePosition()
+
+        try {
+            windowManager.addView(handle, params)
+        } catch (error: RuntimeException) {
+            moveHandleView = null
+            moveHandleLayoutParams = null
+            Log.e(TAG, "Failed to show move handle", error)
+        }
+    }
+
+    private fun attachMoveHandleListener(
+        handle: View,
+        handleParams: WindowManager.LayoutParams,
+    ) {
+        handle.setOnTouchListener(object : View.OnTouchListener {
+            private var initialTargetX = 0
+            private var initialTargetY = 0
+            private var initialTouchX = 0f
+            private var initialTouchY = 0f
+
+            override fun onTouch(view: View, event: MotionEvent): Boolean {
+                val targetParams = overlayLayoutParams ?: return false
+                val targetView = overlayView ?: return false
+
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        isDraggingTarget = true
+                        initialTargetX = targetParams.x
+                        initialTargetY = targetParams.y
+                        initialTouchX = event.rawX
+                        initialTouchY = event.rawY
+                        return true
+                    }
+
+                    MotionEvent.ACTION_MOVE -> {
+                        targetParams.x = initialTargetX + (event.rawX - initialTouchX).toInt()
+                        targetParams.y = initialTargetY + (event.rawY - initialTouchY).toInt()
+                        clampOverlayPosition(targetParams)
+                        windowManager.updateViewLayout(targetView, targetParams)
+                        updateTargetPositionInternal(
+                            targetParams.x + overlaySizePx / 2,
+                            targetParams.y + overlaySizePx / 2,
+                            updateOverlay = false,
+                        )
+                        positionMoveHandle(handleParams, targetParams)
+                        windowManager.updateViewLayout(view, handleParams)
+                        return true
+                    }
+
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        isDraggingTarget = false
+                        return true
+                    }
+                }
+
+                return false
+            }
+        })
+    }
+
+    private fun updateMoveHandlePosition() {
+        val handle = moveHandleView ?: return
+        val handleParams = moveHandleLayoutParams ?: return
+        val targetParams = overlayLayoutParams ?: return
+        positionMoveHandle(handleParams, targetParams)
+
+        if (handle.isAttachedToWindow) {
+            windowManager.updateViewLayout(handle, handleParams)
+        }
+    }
+
+    private fun positionMoveHandle(
+        handleParams: WindowManager.LayoutParams,
+        targetParams: WindowManager.LayoutParams,
+    ) {
+        val displayMetrics = resources.displayMetrics
+        val handleWidth = dp(56)
+        val handleHeight = dp(36)
+        val gap = dp(8)
+        val rightX = targetParams.x + overlaySizePx + gap
+        handleParams.x = if (rightX + handleWidth <= displayMetrics.widthPixels) {
+            rightX
+        } else {
+            (targetParams.x - handleWidth - gap).coerceAtLeast(0)
+        }
+        handleParams.y = (targetParams.y + (overlaySizePx - handleHeight) / 2)
+            .coerceIn(0, (displayMetrics.heightPixels - handleHeight).coerceAtLeast(0))
+    }
+
+    private fun hideMoveHandleInternal() {
+        moveHandleView?.let { view ->
+            try {
+                windowManager.removeView(view)
+            } catch (error: RuntimeException) {
+                Log.w(TAG, "Failed to remove move handle cleanly", error)
+            }
+        }
+        moveHandleView = null
+        moveHandleLayoutParams = null
+        isDraggingTarget = false
+    }
+
     private fun showControlInternal() {
         if (controlView != null) {
             return
@@ -329,6 +470,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     }
 
     private fun removeOverlayInternal() {
+        hideMoveHandleInternal()
         overlayView?.let { view ->
             try {
                 windowManager.removeView(view)
@@ -352,7 +494,6 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
     private fun dispatchTap(x: Int, y: Int) {
         gestureInProgress = true
-        setOverlayTouchable(false)
 
         val tapPath = Path().apply {
             moveTo(x.toFloat(), y.toFloat())
@@ -381,7 +522,6 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
     private fun finishGestureDispatch() {
         gestureInProgress = false
-        setOverlayTouchable(true)
     }
 
     private fun notifyStateChanged() {
@@ -402,6 +542,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         overlayLayoutParams?.let { params ->
             clampOverlayPosition(params)
             overlayView?.let { windowManager.updateViewLayout(it, params) }
+            updateMoveHandlePosition()
         }
     }
 
