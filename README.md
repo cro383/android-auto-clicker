@@ -11,22 +11,20 @@ The goal is not to keep this as an Expo demo. The long-term goal is a real Andro
 
 ## Current Status
 
-The app currently has a working in-app prototype:
+The app now has a working native Android auto clicker implementation:
 
 - Draggable red target
-- Coordinate display
-- Saved target position with AsyncStorage
+- Accessibility Service and real taps through `dispatchGesture()`
+- Floating overlay target over other Android apps
+- Separate `MOVE` handle while auto clicking
+- Saved target position
 - Start and Stop controls
 - Adjustable click interval
-- Simulated click count
-- Visual click ripple at the captured click point
+- Native click count and state synchronization
+- Permission status and shortcuts to Android settings
+- Standalone release APK build verified without Metro
 
-Native Android bridge files also exist, but they are placeholders at this stage:
-
-- `android/app/src/main/java/com/cro383/autoclicker/AutoClickerModule.kt`
-- `android/app/src/main/java/com/cro383/autoclicker/AutoClickerPackage.kt`
-
-The current JavaScript timer does not perform real Android taps yet.
+For the full implementation status, usage instructions, testing notes, troubleshooting, and remaining work, see [PROJECT_SUMMARY.md](./PROJECT_SUMMARY.md).
 
 ## Tech Stack
 
@@ -38,7 +36,7 @@ The current JavaScript timer does not perform real Android taps yet.
 - React Native Gesture Handler
 - React Native Reanimated
 - AsyncStorage
-- Kotlin Android native module placeholder
+- Kotlin Android native module and Accessibility Service
 
 ## Project Structure
 
