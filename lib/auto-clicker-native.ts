@@ -10,6 +10,7 @@ type AutoClickerNativeModule = {
   stop(): void;
   setInterval(intervalMs: number): void;
   setTargetPosition(x: number, y: number): void;
+  initializeTargetPosition(x: number, y: number): void;
   showOverlay(): void;
   hideOverlay(): void;
   checkOverlayVisible(): Promise<boolean>;
@@ -40,6 +41,8 @@ export const AutoClickerNative = {
   setInterval: (intervalMs: number) => requireAndroidModule().setInterval(intervalMs),
   setTargetPosition: (x: number, y: number) =>
     requireAndroidModule().setTargetPosition(x, y),
+  initializeTargetPosition: (x: number, y: number) =>
+    requireAndroidModule().initializeTargetPosition(x, y),
   showOverlay: () => requireAndroidModule().showOverlay(),
   hideOverlay: () => requireAndroidModule().hideOverlay(),
   checkOverlayVisible: () => requireAndroidModule().checkOverlayVisible(),

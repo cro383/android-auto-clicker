@@ -25,6 +25,10 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         private const val TAG = "AutoClickerService"
         private const val MIN_INTERVAL_MS = 100L
         private const val MAX_INTERVAL_MS = 5_000L
+        private const val PREFERENCES_NAME = "auto_clicker_native"
+        private const val KEY_TARGET_X = "target_x"
+        private const val KEY_TARGET_Y = "target_y"
+        private const val KEY_HAS_TARGET = "has_target"
 
         @Volatile
         private var instance: AutoClickerAccessibilityService? = null
@@ -57,6 +61,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     private var moveHandleView: TextView? = null
     private var moveHandleLayoutParams: WindowManager.LayoutParams? = null
     private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
+    private val preferences by lazy { getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE) }
     private val overlaySizePx by lazy { (80 * resources.displayMetrics.density).toInt() }
 
     private val clickRunnable = object : Runnable {
@@ -74,6 +79,10 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        if (preferences.getBoolean(KEY_HAS_TARGET, false)) {
+            targetX = preferences.getInt(KEY_TARGET_X, 0)
+            targetY = preferences.getInt(KEY_TARGET_Y, 0)
+        }
         instance = this
         Log.i(TAG, "Accessibility service connected")
     }
@@ -110,7 +119,15 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
     fun setTargetPosition(x: Int, y: Int) {
         clickHandler.post {
-            updateTargetPositionInternal(x, y, updateOverlay = true)
+            updateTargetPositionInternal(x, y, updateOverlay = true, persist = true)
+        }
+    }
+
+    fun initializeTargetPosition(x: Int, y: Int) {
+        clickHandler.post {
+            if (!preferences.getBoolean(KEY_HAS_TARGET, false)) {
+                updateTargetPositionInternal(x, y, updateOverlay = true, persist = true)
+            }
         }
     }
 
@@ -145,9 +162,22 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         Log.i(TAG, "Auto clicker stopped")
     }
 
-    private fun updateTargetPositionInternal(x: Int, y: Int, updateOverlay: Boolean) {
+    private fun updateTargetPositionInternal(
+        x: Int,
+        y: Int,
+        updateOverlay: Boolean,
+        persist: Boolean,
+    ) {
         targetX = x.coerceAtLeast(0)
         targetY = y.coerceAtLeast(0)
+
+        if (persist) {
+            preferences.edit()
+                .putBoolean(KEY_HAS_TARGET, true)
+                .putInt(KEY_TARGET_X, targetX)
+                .putInt(KEY_TARGET_Y, targetY)
+                .apply()
+        }
 
         if (updateOverlay) {
             val params = overlayLayoutParams
@@ -239,6 +269,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
                             params.x + overlaySizePx / 2,
                             params.y + overlaySizePx / 2,
                             updateOverlay = false,
+                            persist = true,
                         )
                         return true
                     }
@@ -342,6 +373,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
                             targetParams.x + overlaySizePx / 2,
                             targetParams.y + overlaySizePx / 2,
                             updateOverlay = false,
+                            persist = true,
                         )
                         positionMoveHandle(handleParams, targetParams)
                         windowManager.updateViewLayout(view, handleParams)
@@ -542,6 +574,12 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         overlayLayoutParams?.let { params ->
             clampOverlayPosition(params)
             overlayView?.let { windowManager.updateViewLayout(it, params) }
+            updateTargetPositionInternal(
+                params.x + overlaySizePx / 2,
+                params.y + overlaySizePx / 2,
+                updateOverlay = false,
+                persist = true,
+            )
             updateMoveHandlePosition()
         }
     }

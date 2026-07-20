@@ -66,6 +66,11 @@ class AutoClickerModule(reactContext: ReactApplicationContext) : ReactContextBas
     }
 
     @ReactMethod
+    fun initializeTargetPosition(x: Int, y: Int) {
+        withService("initializeTargetPosition") { it.initializeTargetPosition(x, y) }
+    }
+
+    @ReactMethod
     fun showOverlay() {
         withService("showOverlay") { it.showOverlay() }
     }

@@ -47,16 +47,19 @@ export function DraggableTarget({ clickPulse = 0 }: DraggableTargetProps) {
   const coordsRef = useRef(coords);
   coordsRef.current = coords;
 
-  const syncNativeTargetPosition = useCallback((x: number, y: number) => {
+  const syncNativeTargetPosition = useCallback((x: number, y: number, initialize = false) => {
     if (!AutoClickerNative.isAvailable) {
       return;
     }
 
     const origin = containerOriginRef.current;
-    AutoClickerNative.setTargetPosition(
-      Math.round(origin.x + x + TARGET_SIZE / 2),
-      Math.round(origin.y + y + TARGET_SIZE / 2),
-    );
+    const screenX = Math.round(origin.x + x + TARGET_SIZE / 2);
+    const screenY = Math.round(origin.y + y + TARGET_SIZE / 2);
+    if (initialize) {
+      AutoClickerNative.initializeTargetPosition(screenX, screenY);
+    } else {
+      AutoClickerNative.setTargetPosition(screenX, screenY);
+    }
   }, []);
 
   const applyPosition = useCallback(
@@ -66,7 +69,7 @@ export function DraggableTarget({ clickPulse = 0 }: DraggableTargetProps) {
       translateY.value = y;
       coordsRef.current = rounded;
       setCoords(rounded);
-      syncNativeTargetPosition(x, y);
+      syncNativeTargetPosition(x, y, true);
     },
     [syncNativeTargetPosition, translateX, translateY],
   );
@@ -93,15 +96,21 @@ export function DraggableTarget({ clickPulse = 0 }: DraggableTargetProps) {
       containerWidth.value = width;
       containerHeight.value = height;
 
-      containerRef.current?.measureInWindow((windowX, windowY) => {
-        containerOriginRef.current = { x: windowX, y: windowY };
-        syncNativeTargetPosition(coordsRef.current.x, coordsRef.current.y);
-      });
-
       const centerX = (width - TARGET_SIZE) / 2;
       const centerY = (height - TARGET_SIZE) / 2;
 
       void (async () => {
+        const origin = await new Promise<Point>((resolve) => {
+          const container = containerRef.current;
+          if (!container) {
+            resolve(containerOriginRef.current);
+            return;
+          }
+          container.measureInWindow((windowX, windowY) => {
+            resolve({ x: windowX, y: windowY });
+          });
+        });
+        containerOriginRef.current = origin;
         const saved = await loadTargetPosition();
         const position = clampTargetPosition(
           saved ?? { x: centerX, y: centerY },
@@ -113,7 +122,7 @@ export function DraggableTarget({ clickPulse = 0 }: DraggableTargetProps) {
         setReady(true);
       })();
     },
-    [applyPosition, containerHeight, containerWidth, syncNativeTargetPosition],
+    [applyPosition, containerHeight, containerWidth],
   );
 
   const pan = Gesture.Pan()
