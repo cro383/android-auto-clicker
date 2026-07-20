@@ -304,17 +304,17 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         val handle = TextView(this).apply {
             text = "MOVE"
             setTextColor(Color.WHITE)
-            textSize = 11f
+            textSize = 22f
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                cornerRadius = dp(18).toFloat()
+                cornerRadius = dp(36).toFloat()
                 setColor(Color.rgb(37, 99, 235))
-                setStroke(dp(1), Color.WHITE)
+                setStroke(dp(2), Color.WHITE)
             }
         }
         val params = WindowManager.LayoutParams(
-            dp(56),
-            dp(36),
+            dp(112),
+            dp(72),
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             } else {
@@ -407,8 +407,8 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         targetParams: WindowManager.LayoutParams,
     ) {
         val displayMetrics = resources.displayMetrics
-        val handleWidth = dp(56)
-        val handleHeight = dp(36)
+        val handleWidth = dp(112)
+        val handleHeight = dp(72)
         val gap = dp(8)
         val rightX = targetParams.x + overlaySizePx + gap
         handleParams.x = if (rightX + handleWidth <= displayMetrics.widthPixels) {
