@@ -48,6 +48,8 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
     @Volatile
     private var clickCount = 0
+    private var isDraggingTarget = false
+    private var gestureInProgress = false
     private var overlayView: View? = null
     private var overlayLayoutParams: WindowManager.LayoutParams? = null
     private var controlView: TextView? = null
@@ -61,7 +63,9 @@ class AutoClickerAccessibilityService : AccessibilityService() {
                 return
             }
 
-            dispatchTap(targetX, targetY)
+            if (!isDraggingTarget && !gestureInProgress) {
+                dispatchTap(targetX, targetY)
+            }
             clickHandler.postDelayed(this, clickIntervalMs)
         }
     }
@@ -80,7 +84,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
             showOverlayInternal()
             isRunning = true
-            setOverlayTouchable(false)
+            setOverlayTouchable(true)
             updateControlButton()
             notifyStateChanged()
             clickHandler.post(clickRunnable)
@@ -213,6 +217,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
             override fun onTouch(view: View, event: MotionEvent): Boolean {
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
+                        isDraggingTarget = true
                         initialX = params.x
                         initialY = params.y
                         initialTouchX = event.rawX
@@ -233,7 +238,10 @@ class AutoClickerAccessibilityService : AccessibilityService() {
                         return true
                     }
 
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> return true
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        isDraggingTarget = false
+                        return true
+                    }
                 }
 
                 return false
@@ -343,6 +351,9 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     }
 
     private fun dispatchTap(x: Int, y: Int) {
+        gestureInProgress = true
+        setOverlayTouchable(false)
+
         val tapPath = Path().apply {
             moveTo(x.toFloat(), y.toFloat())
         }
@@ -354,12 +365,23 @@ class AutoClickerAccessibilityService : AccessibilityService() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 clickCount += 1
                 notifyStateChanged()
+                finishGestureDispatch()
+            }
+
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                finishGestureDispatch()
             }
         }
 
         if (!dispatchGesture(gesture, callback, null)) {
             Log.w(TAG, "Gesture dispatch rejected at ($x, $y)")
+            finishGestureDispatch()
         }
+    }
+
+    private fun finishGestureDispatch() {
+        gestureInProgress = false
+        setOverlayTouchable(true)
     }
 
     private fun notifyStateChanged() {
