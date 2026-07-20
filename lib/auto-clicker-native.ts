@@ -6,7 +6,7 @@ export type AutoClickerNativeState = {
 };
 
 type AutoClickerNativeModule = {
-  start(): void;
+  start(): Promise<boolean>;
   stop(): void;
   setInterval(intervalMs: number): void;
   setTargetPosition(x: number, y: number): void;

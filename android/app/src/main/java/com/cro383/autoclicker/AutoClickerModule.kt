@@ -38,8 +38,16 @@ class AutoClickerModule(reactContext: ReactApplicationContext) : ReactContextBas
     override fun getName() = "AutoClicker"
 
     @ReactMethod
-    fun start() {
-        withService("start") { it.startAutoClicker() }
+    fun start(promise: Promise) {
+        val service = AutoClickerAccessibilityService.getInstance()
+        if (service == null) {
+            Log.w(TAG, "start ignored because the accessibility service is not connected")
+            promise.resolve(false)
+            return
+        }
+
+        service.startAutoClicker()
+        promise.resolve(true)
     }
 
     @ReactMethod
