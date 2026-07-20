@@ -27,5 +27,17 @@
         <data android:scheme="myfirstapp"/>
       </intent-filter>
     </activity>
+    <service
+      android:name=".AutoClickerAccessibilityService"
+      android:exported="false"
+      android:label="@string/accessibility_service_label"
+      android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+      <intent-filter>
+        <action android:name="android.accessibilityservice.AccessibilityService"/>
+      </intent-filter>
+      <meta-data
+        android:name="android.accessibilityservice"
+        android:resource="@xml/auto_clicker_accessibility_service"/>
+    </service>
   </application>
 </manifest>
