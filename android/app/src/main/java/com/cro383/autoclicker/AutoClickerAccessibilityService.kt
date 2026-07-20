@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -16,6 +17,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.widget.TextView
 
 class AutoClickerAccessibilityService : AccessibilityService() {
 
@@ -27,16 +29,29 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         @Volatile
         private var instance: AutoClickerAccessibilityService? = null
 
+        @Volatile
+        private var stateListener: ((Boolean, Int) -> Unit)? = null
+
         fun getInstance(): AutoClickerAccessibilityService? = instance
+
+        fun setStateListener(listener: ((Boolean, Int) -> Unit)?) {
+            stateListener = listener
+        }
     }
 
     private val clickHandler = Handler(Looper.getMainLooper())
     private var clickIntervalMs = 1_000L
     private var targetX = 0
     private var targetY = 0
+    @Volatile
     private var isRunning = false
+
+    @Volatile
+    private var clickCount = 0
     private var overlayView: View? = null
     private var overlayLayoutParams: WindowManager.LayoutParams? = null
+    private var controlView: TextView? = null
+    private var controlLayoutParams: WindowManager.LayoutParams? = null
     private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
     private val overlaySizePx by lazy { (80 * resources.displayMetrics.density).toInt() }
 
@@ -66,6 +81,8 @@ class AutoClickerAccessibilityService : AccessibilityService() {
             showOverlayInternal()
             isRunning = true
             setOverlayTouchable(false)
+            updateControlButton()
+            notifyStateChanged()
             clickHandler.post(clickRunnable)
             Log.i(TAG, "Auto clicker started at ($targetX, $targetY), interval=$clickIntervalMs")
         }
@@ -98,16 +115,25 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
     fun hideOverlay() {
         clickHandler.post {
+            if (isRunning) {
+                stopAutoClickerInternal()
+            }
             removeOverlayInternal()
         }
     }
 
     fun isOverlayVisible(): Boolean = overlayView != null
 
+    fun isAutoClickerRunning(): Boolean = isRunning
+
+    fun getClickCount(): Int = clickCount
+
     private fun stopAutoClickerInternal() {
         isRunning = false
         clickHandler.removeCallbacks(clickRunnable)
         setOverlayTouchable(true)
+        updateControlButton()
+        notifyStateChanged()
         Log.i(TAG, "Auto clicker stopped")
     }
 
@@ -169,6 +195,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
             windowManager.addView(targetView, params)
             overlayView = targetView
             overlayLayoutParams = params
+            showControlInternal()
             setOverlayTouchable(!isRunning)
             Log.i(TAG, "Floating target shown")
         } catch (error: RuntimeException) {
@@ -225,6 +252,68 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         windowManager.updateViewLayout(view, params)
     }
 
+    private fun showControlInternal() {
+        if (controlView != null) {
+            return
+        }
+
+        val control = TextView(this).apply {
+            text = if (isRunning) "STOP" else "START"
+            setTextColor(Color.WHITE)
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setPadding(dp(18), 0, dp(18), 0)
+            background = createControlBackground(isRunning)
+            setOnClickListener {
+                if (isRunning) {
+                    stopAutoClicker()
+                } else {
+                    startAutoClicker()
+                }
+            }
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            dp(48),
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                WindowManager.LayoutParams.TYPE_PHONE
+            },
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.END
+            x = dp(16)
+            y = dp(96)
+        }
+
+        try {
+            windowManager.addView(control, params)
+            controlView = control
+            controlLayoutParams = params
+        } catch (error: RuntimeException) {
+            Log.e(TAG, "Failed to show floating controls", error)
+        }
+    }
+
+    private fun updateControlButton() {
+        controlView?.apply {
+            text = if (isRunning) "STOP" else "START"
+            background = createControlBackground(isRunning)
+        }
+    }
+
+    private fun createControlBackground(running: Boolean): GradientDrawable {
+        return GradientDrawable().apply {
+            cornerRadius = dp(10).toFloat()
+            setColor(if (running) Color.rgb(185, 28, 28) else Color.rgb(22, 163, 74))
+            setStroke(dp(1), Color.WHITE)
+        }
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
     private fun clampOverlayPosition(params: WindowManager.LayoutParams) {
         val displayMetrics = resources.displayMetrics
         params.x = params.x.coerceIn(0, (displayMetrics.widthPixels - overlaySizePx).coerceAtLeast(0))
@@ -232,15 +321,24 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     }
 
     private fun removeOverlayInternal() {
-        val view = overlayView ?: return
-        try {
-            windowManager.removeView(view)
-        } catch (error: RuntimeException) {
-            Log.w(TAG, "Failed to remove floating target cleanly", error)
-        } finally {
-            overlayView = null
-            overlayLayoutParams = null
+        overlayView?.let { view ->
+            try {
+                windowManager.removeView(view)
+            } catch (error: RuntimeException) {
+                Log.w(TAG, "Failed to remove floating target cleanly", error)
+            }
         }
+        controlView?.let { view ->
+            try {
+                windowManager.removeView(view)
+            } catch (error: RuntimeException) {
+                Log.w(TAG, "Failed to remove floating controls cleanly", error)
+            }
+        }
+        overlayView = null
+        overlayLayoutParams = null
+        controlView = null
+        controlLayoutParams = null
         Log.i(TAG, "Floating target hidden")
     }
 
@@ -252,9 +350,20 @@ class AutoClickerAccessibilityService : AccessibilityService() {
             .addStroke(GestureDescription.StrokeDescription(tapPath, 0, 1))
             .build()
 
-        if (!dispatchGesture(gesture, null, null)) {
+        val callback = object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                clickCount += 1
+                notifyStateChanged()
+            }
+        }
+
+        if (!dispatchGesture(gesture, callback, null)) {
             Log.w(TAG, "Gesture dispatch rejected at ($x, $y)")
         }
+    }
+
+    private fun notifyStateChanged() {
+        stateListener?.invoke(isRunning, clickCount)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -264,6 +373,14 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {
         stopAutoClicker()
         Log.w(TAG, "Accessibility service interrupted")
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        overlayLayoutParams?.let { params ->
+            clampOverlayPosition(params)
+            overlayView?.let { windowManager.updateViewLayout(it, params) }
+        }
     }
 
     override fun onDestroy() {

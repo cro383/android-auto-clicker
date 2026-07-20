@@ -42,6 +42,26 @@ export function useAutoClickEngine() {
   }, [intervalMs]);
 
   useEffect(() => {
+    if (!AutoClickerNative.isAvailable) {
+      return;
+    }
+
+    const subscription = AutoClickerNative.subscribeToState((state) => {
+      setIsRunning(state.isRunning);
+      setClickCount(state.clickCount);
+    });
+    void AutoClickerNative.getState()
+      .then((state) => {
+        setIsRunning(state.isRunning);
+        setClickCount(state.clickCount);
+      })
+      .catch(() => {
+        // Keep the local UI state if the native service is reconnecting.
+      });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (AutoClickerNative.isAvailable) {
         AutoClickerNative.stop();
@@ -50,6 +70,10 @@ export function useAutoClickEngine() {
   }, []);
 
   useEffect(() => {
+    if (AutoClickerNative.isAvailable) {
+      return;
+    }
+
     if (!isRunning) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);

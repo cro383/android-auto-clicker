@@ -1,4 +1,9 @@
-import { NativeModules, Platform } from 'react-native';
+import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
+
+export type AutoClickerNativeState = {
+  isRunning: boolean;
+  clickCount: number;
+};
 
 type AutoClickerNativeModule = {
   start(): void;
@@ -8,6 +13,9 @@ type AutoClickerNativeModule = {
   showOverlay(): void;
   hideOverlay(): void;
   checkOverlayVisible(): Promise<boolean>;
+  getState(): Promise<AutoClickerNativeState>;
+  addListener(eventName: string): void;
+  removeListeners(count: number): void;
   checkAccessibilityPermission(): Promise<boolean>;
   requestAccessibilityPermission(): void;
   checkOverlayPermission(): Promise<boolean>;
@@ -15,6 +23,7 @@ type AutoClickerNativeModule = {
 };
 
 const nativeModule = NativeModules.AutoClicker as AutoClickerNativeModule | undefined;
+const nativeEvents = nativeModule ? new NativeEventEmitter(NativeModules.AutoClicker) : null;
 
 function requireAndroidModule(): AutoClickerNativeModule {
   if (Platform.OS !== 'android' || !nativeModule) {
@@ -34,10 +43,17 @@ export const AutoClickerNative = {
   showOverlay: () => requireAndroidModule().showOverlay(),
   hideOverlay: () => requireAndroidModule().hideOverlay(),
   checkOverlayVisible: () => requireAndroidModule().checkOverlayVisible(),
+  getState: () => requireAndroidModule().getState(),
   checkAccessibilityPermission: () =>
     requireAndroidModule().checkAccessibilityPermission(),
   requestAccessibilityPermission: () =>
     requireAndroidModule().requestAccessibilityPermission(),
   checkOverlayPermission: () => requireAndroidModule().checkOverlayPermission(),
   requestOverlayPermission: () => requireAndroidModule().requestOverlayPermission(),
+  subscribeToState: (listener: (state: AutoClickerNativeState) => void) => {
+    if (!nativeEvents) {
+      return { remove() {} };
+    }
+    return nativeEvents.addListener('AutoClickerStateChanged', listener);
+  },
 };

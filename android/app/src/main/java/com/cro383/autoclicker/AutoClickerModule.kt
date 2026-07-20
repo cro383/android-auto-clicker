@@ -9,11 +9,30 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class AutoClickerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
     companion object {
         private const val TAG = "AutoClickerModule"
+        private const val STATE_EVENT = "AutoClickerStateChanged"
+    }
+
+    init {
+        AutoClickerAccessibilityService.setStateListener { isRunning, clickCount ->
+            val payload = Arguments.createMap().apply {
+                putBoolean("isRunning", isRunning)
+                putInt("clickCount", clickCount)
+            }
+            try {
+                reactApplicationContext
+                    .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                    .emit(STATE_EVENT, payload)
+            } catch (error: RuntimeException) {
+                Log.w(TAG, "Unable to emit native state", error)
+            }
+        }
     }
 
     override fun getName() = "AutoClicker"
@@ -51,6 +70,26 @@ class AutoClickerModule(reactContext: ReactApplicationContext) : ReactContextBas
     @ReactMethod
     fun checkOverlayVisible(promise: Promise) {
         promise.resolve(AutoClickerAccessibilityService.getInstance()?.isOverlayVisible() ?: false)
+    }
+
+    @ReactMethod
+    fun getState(promise: Promise) {
+        val service = AutoClickerAccessibilityService.getInstance()
+        val payload = Arguments.createMap().apply {
+            putBoolean("isRunning", service?.isAutoClickerRunning() ?: false)
+            putInt("clickCount", service?.getClickCount() ?: 0)
+        }
+        promise.resolve(payload)
+    }
+
+    @ReactMethod
+    fun addListener(eventName: String) {
+        Log.d(TAG, "Listener added for $eventName")
+    }
+
+    @ReactMethod
+    fun removeListeners(count: Int) {
+        Log.d(TAG, "$count listener(s) removed")
     }
 
     @ReactMethod
@@ -116,5 +155,10 @@ class AutoClickerModule(reactContext: ReactApplicationContext) : ReactContextBas
         }
 
         action(service)
+    }
+
+    override fun invalidate() {
+        AutoClickerAccessibilityService.setStateListener(null)
+        super.invalidate()
     }
 }
