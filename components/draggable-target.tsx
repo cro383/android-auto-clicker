@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ClickRipple } from '@/components/click-ripple';
+import { AutoClickerNative } from '@/lib/auto-clicker-native';
 import {
   clampTargetPosition,
   loadTargetPosition,
@@ -41,23 +42,42 @@ export function DraggableTarget({ clickPulse = 0 }: DraggableTargetProps) {
   const translateY = useSharedValue(0);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
+  const containerRef = useRef<View>(null);
+  const containerOriginRef = useRef<Point>({ x: 0, y: 0 });
   const coordsRef = useRef(coords);
   coordsRef.current = coords;
 
+  const syncNativeTargetPosition = useCallback((x: number, y: number) => {
+    if (!AutoClickerNative.isAvailable) {
+      return;
+    }
+
+    const origin = containerOriginRef.current;
+    AutoClickerNative.setTargetPosition(
+      Math.round(origin.x + x + TARGET_SIZE / 2),
+      Math.round(origin.y + y + TARGET_SIZE / 2),
+    );
+  }, []);
+
   const applyPosition = useCallback(
     (x: number, y: number) => {
+      const rounded = { x: Math.round(x), y: Math.round(y) };
       translateX.value = x;
       translateY.value = y;
-      setCoords({ x: Math.round(x), y: Math.round(y) });
+      coordsRef.current = rounded;
+      setCoords(rounded);
+      syncNativeTargetPosition(x, y);
     },
-    [translateX, translateY],
+    [syncNativeTargetPosition, translateX, translateY],
   );
 
   const updateCoords = useCallback((x: number, y: number) => {
     const rounded = { x: Math.round(x), y: Math.round(y) };
+    coordsRef.current = rounded;
     setCoords(rounded);
     void saveTargetPosition(rounded);
-  }, []);
+    syncNativeTargetPosition(x, y);
+  }, [syncNativeTargetPosition]);
 
   useEffect(() => {
     if (clickPulse === 0) {
@@ -72,6 +92,11 @@ export function DraggableTarget({ clickPulse = 0 }: DraggableTargetProps) {
       const { width, height } = event.nativeEvent.layout;
       containerWidth.value = width;
       containerHeight.value = height;
+
+      containerRef.current?.measureInWindow((windowX, windowY) => {
+        containerOriginRef.current = { x: windowX, y: windowY };
+        syncNativeTargetPosition(coordsRef.current.x, coordsRef.current.y);
+      });
 
       const centerX = (width - TARGET_SIZE) / 2;
       const centerY = (height - TARGET_SIZE) / 2;
@@ -88,7 +113,7 @@ export function DraggableTarget({ clickPulse = 0 }: DraggableTargetProps) {
         setReady(true);
       })();
     },
-    [applyPosition, containerHeight, containerWidth],
+    [applyPosition, containerHeight, containerWidth, syncNativeTargetPosition],
   );
 
   const pan = Gesture.Pan()
@@ -111,7 +136,7 @@ export function DraggableTarget({ clickPulse = 0 }: DraggableTargetProps) {
   }));
 
   return (
-    <View style={styles.container} onLayout={onLayout}>
+    <View ref={containerRef} style={styles.container} onLayout={onLayout}>
       <View style={styles.coordsBar}>
         <Text style={styles.coordsText}>
           X: {coords.x}  Y: {coords.y}

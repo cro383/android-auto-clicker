@@ -20,26 +20,22 @@ class AutoClickerModule(reactContext: ReactApplicationContext) : ReactContextBas
 
     @ReactMethod
     fun start() {
-        // Placeholder for starting the auto clicker
-        Log.d(TAG, "start called")
+        withService("start") { it.startAutoClicker() }
     }
 
     @ReactMethod
     fun stop() {
-        // Placeholder for stopping the auto clicker
-        Log.d(TAG, "stop called")
+        withService("stop") { it.stopAutoClicker() }
     }
 
     @ReactMethod
     fun setInterval(interval: Int) {
-        // Placeholder for setting the interval
-        Log.d(TAG, "setInterval called with interval: $interval")
+        withService("setInterval") { it.setClickInterval(interval) }
     }
 
     @ReactMethod
     fun setTargetPosition(x: Int, y: Int) {
-        // Placeholder for setting the target position
-        Log.d(TAG, "setTargetPosition called with x: $x, y: $y")
+        withService("setTargetPosition") { it.setTargetPosition(x, y) }
     }
 
     @ReactMethod
@@ -92,5 +88,18 @@ class AutoClickerModule(reactContext: ReactApplicationContext) : ReactContextBas
     private fun openSettings(intent: Intent) {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         reactApplicationContext.startActivity(intent)
+    }
+
+    private inline fun withService(
+        actionName: String,
+        action: (AutoClickerAccessibilityService) -> Unit,
+    ) {
+        val service = AutoClickerAccessibilityService.getInstance()
+        if (service == null) {
+            Log.w(TAG, "$actionName ignored because the accessibility service is not connected")
+            return
+        }
+
+        action(service)
     }
 }
