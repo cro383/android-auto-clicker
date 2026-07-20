@@ -5,6 +5,9 @@ type AutoClickerNativeModule = {
   stop(): void;
   setInterval(intervalMs: number): void;
   setTargetPosition(x: number, y: number): void;
+  showOverlay(): void;
+  hideOverlay(): void;
+  checkOverlayVisible(): Promise<boolean>;
   checkAccessibilityPermission(): Promise<boolean>;
   requestAccessibilityPermission(): void;
   checkOverlayPermission(): Promise<boolean>;
@@ -28,6 +31,9 @@ export const AutoClickerNative = {
   setInterval: (intervalMs: number) => requireAndroidModule().setInterval(intervalMs),
   setTargetPosition: (x: number, y: number) =>
     requireAndroidModule().setTargetPosition(x, y),
+  showOverlay: () => requireAndroidModule().showOverlay(),
+  hideOverlay: () => requireAndroidModule().hideOverlay(),
+  checkOverlayVisible: () => requireAndroidModule().checkOverlayVisible(),
   checkAccessibilityPermission: () =>
     requireAndroidModule().checkAccessibilityPermission(),
   requestAccessibilityPermission: () =>

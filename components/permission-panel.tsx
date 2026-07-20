@@ -6,11 +6,13 @@ import { AutoClickerNative } from '@/lib/auto-clicker-native';
 type PermissionState = {
   accessibility: boolean;
   overlay: boolean;
+  overlayVisible: boolean;
 };
 
 const INITIAL_STATE: PermissionState = {
   accessibility: false,
   overlay: false,
+  overlayVisible: false,
 };
 
 export function PermissionPanel() {
@@ -24,11 +26,12 @@ export function PermissionPanel() {
     }
 
     try {
-      const [accessibility, overlay] = await Promise.all([
+      const [accessibility, overlay, overlayVisible] = await Promise.all([
         AutoClickerNative.checkAccessibilityPermission(),
         AutoClickerNative.checkOverlayPermission(),
+        AutoClickerNative.checkOverlayVisible(),
       ]);
-      setPermissions({ accessibility, overlay });
+      setPermissions({ accessibility, overlay, overlayVisible });
     } finally {
       setIsLoading(false);
     }
@@ -60,6 +63,35 @@ export function PermissionPanel() {
         isLoading={isLoading}
         onPress={AutoClickerNative.requestOverlayPermission}
       />
+      <View style={styles.row}>
+        <View style={styles.labelGroup}>
+          <Text style={styles.label}>Floating target</Text>
+          <Text style={[styles.status, permissions.overlayVisible && styles.granted]}>
+            {permissions.overlayVisible ? 'Visible' : 'Hidden'}
+          </Text>
+        </View>
+        <Pressable
+          style={[
+            styles.button,
+            (!permissions.accessibility || !permissions.overlay) && styles.buttonDisabled,
+          ]}
+          disabled={!permissions.accessibility || !permissions.overlay}
+          onPress={() => {
+            if (permissions.overlayVisible) {
+              AutoClickerNative.hideOverlay();
+            } else {
+              AutoClickerNative.showOverlay();
+            }
+            setPermissions((current) => ({
+              ...current,
+              overlayVisible: !current.overlayVisible,
+            }));
+          }}>
+          <Text style={styles.buttonText}>
+            {permissions.overlayVisible ? 'Hide target' : 'Show target'}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }

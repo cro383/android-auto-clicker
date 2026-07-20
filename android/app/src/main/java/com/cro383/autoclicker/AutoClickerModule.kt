@@ -39,6 +39,21 @@ class AutoClickerModule(reactContext: ReactApplicationContext) : ReactContextBas
     }
 
     @ReactMethod
+    fun showOverlay() {
+        withService("showOverlay") { it.showOverlay() }
+    }
+
+    @ReactMethod
+    fun hideOverlay() {
+        withService("hideOverlay") { it.hideOverlay() }
+    }
+
+    @ReactMethod
+    fun checkOverlayVisible(promise: Promise) {
+        promise.resolve(AutoClickerAccessibilityService.getInstance()?.isOverlayVisible() ?: false)
+    }
+
+    @ReactMethod
     fun checkAccessibilityPermission(promise: Promise) {
         val accessibilityEnabled = Settings.Secure.getInt(
             reactApplicationContext.contentResolver,
