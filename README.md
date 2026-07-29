@@ -21,7 +21,9 @@ The app now has a working native Android auto clicker implementation:
 - Start and Stop controls
 - Adjustable click interval
 - Native click count and state synchronization
-- Permission status and shortcuts to Android settings
+- Guided Accessibility Service and overlay permission setup
+- User-touch priority with a 200ms auto-click pause
+- Korean floating status labels and matching status colors
 - Standalone release APK build verified without Metro
 
 For the full implementation status, usage instructions, testing notes, troubleshooting, and remaining work, see [PROJECT_SUMMARY.md](./PROJECT_SUMMARY.md).
