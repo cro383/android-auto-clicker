@@ -26,7 +26,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         private const val TAG = "AutoClickerService"
         private const val MIN_INTERVAL_MS = 100L
         private const val MAX_INTERVAL_MS = 5_000L
-        private const val USER_TOUCH_PAUSE_MS = 1_000L
+        private const val USER_TOUCH_PAUSE_MS = 200L
         private const val PREFERENCES_NAME = "auto_clicker_native"
         private const val KEY_TARGET_X = "target_x"
         private const val KEY_TARGET_Y = "target_y"
