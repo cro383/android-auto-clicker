@@ -54,13 +54,13 @@ export function AutoClickPanel({
           style={[styles.button, styles.startButton, isRunning && styles.buttonDisabled]}
           onPress={start}
           disabled={isRunning}>
-          <Text style={styles.buttonText}>Start</Text>
+          <Text style={styles.buttonText}>정지</Text>
         </Pressable>
         <Pressable
           style={[styles.button, styles.stopButton, !isRunning && styles.buttonDisabled]}
           onPress={stop}
           disabled={!isRunning}>
-          <Text style={styles.buttonText}>Stop</Text>
+          <Text style={styles.buttonText}>시작</Text>
         </Pressable>
       </View>
     </View>

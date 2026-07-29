@@ -193,13 +193,13 @@ export function WebDemoAutoClicker({
                 style={[styles.actionButton, styles.startButton, isRunning && styles.buttonDisabled]}
                 onPress={start}
                 disabled={isRunning}>
-                <Text style={styles.actionButtonText}>Start</Text>
+                <Text style={styles.actionButtonText}>정지</Text>
               </Pressable>
               <Pressable
                 style={[styles.actionButton, styles.stopButton, !isRunning && styles.buttonDisabled]}
                 onPress={stop}
                 disabled={!isRunning}>
-                <Text style={styles.actionButtonText}>Stop</Text>
+                <Text style={styles.actionButtonText}>시작</Text>
               </Pressable>
             </View>
 
