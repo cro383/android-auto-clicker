@@ -1,10 +1,12 @@
 package com.cro383.autoclicker
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.util.Log
+import android.view.accessibility.AccessibilityManager
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
@@ -107,29 +109,27 @@ class AutoClickerModule(reactContext: ReactApplicationContext) : ReactContextBas
 
     @ReactMethod
     fun checkAccessibilityPermission(promise: Promise) {
-        val accessibilityEnabled = Settings.Secure.getInt(
-            reactApplicationContext.contentResolver,
-            Settings.Secure.ACCESSIBILITY_ENABLED,
-            0,
-        ) == 1
-
-        if (!accessibilityEnabled) {
-            promise.resolve(false)
+        if (AutoClickerAccessibilityService.getInstance() != null) {
+            promise.resolve(true)
             return
         }
 
-        val serviceName = ComponentName(
+        val accessibilityManager = reactApplicationContext.getSystemService(
+            AccessibilityManager::class.java,
+        )
+        val expectedComponent = ComponentName(
             reactApplicationContext,
             AutoClickerAccessibilityService::class.java,
-        ).flattenToString()
-        val enabledServices = Settings.Secure.getString(
-            reactApplicationContext.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-        ).orEmpty()
-
-        promise.resolve(
-            enabledServices.split(':').any { it.equals(serviceName, ignoreCase = true) },
         )
+        val isEnabled = accessibilityManager
+            .getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            .any { service ->
+                val serviceInfo = service.resolveInfo.serviceInfo
+                serviceInfo.packageName == expectedComponent.packageName &&
+                    serviceInfo.name == expectedComponent.className
+            }
+
+        promise.resolve(isEnabled)
     }
 
     @ReactMethod

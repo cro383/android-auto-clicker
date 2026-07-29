@@ -439,7 +439,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         }
 
         val control = TextView(this).apply {
-            text = if (isRunning) "STOP" else "START"
+            text = if (isRunning) "시작" else "정지"
             setTextColor(Color.WHITE)
             textSize = 15f
             gravity = Gravity.CENTER
@@ -480,7 +480,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
     private fun updateControlButton() {
         controlView?.apply {
-            text = if (isRunning) "STOP" else "START"
+            text = if (isRunning) "시작" else "정지"
             background = createControlBackground(isRunning)
         }
     }
