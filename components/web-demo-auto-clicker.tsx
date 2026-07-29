@@ -414,10 +414,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   startButton: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#dc2626',
   },
   stopButton: {
-    backgroundColor: '#dc2626',
+    backgroundColor: '#16a34a',
   },
   buttonDisabled: {
     opacity: 0.45,

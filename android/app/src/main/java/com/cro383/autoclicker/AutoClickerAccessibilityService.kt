@@ -10,6 +10,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
@@ -25,6 +26,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         private const val TAG = "AutoClickerService"
         private const val MIN_INTERVAL_MS = 100L
         private const val MAX_INTERVAL_MS = 5_000L
+        private const val USER_TOUCH_RESUME_DELAY_MS = 500L
         private const val PREFERENCES_NAME = "auto_clicker_native"
         private const val KEY_TARGET_X = "target_x"
         private const val KEY_TARGET_Y = "target_y"
@@ -54,6 +56,8 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     private var clickCount = 0
     private var isDraggingTarget = false
     private var gestureInProgress = false
+    private var isUserTouchActive = false
+    private var userTouchResumeAtMs = 0L
     private var overlayView: View? = null
     private var overlayLayoutParams: WindowManager.LayoutParams? = null
     private var controlView: TextView? = null
@@ -70,7 +74,12 @@ class AutoClickerAccessibilityService : AccessibilityService() {
                 return
             }
 
-            if (!isDraggingTarget && !gestureInProgress) {
+            if (
+                !isDraggingTarget &&
+                !gestureInProgress &&
+                !isUserTouchActive &&
+                SystemClock.uptimeMillis() >= userTouchResumeAtMs
+            ) {
                 dispatchTap(targetX, targetY)
             }
             clickHandler.postDelayed(this, clickIntervalMs)
@@ -154,6 +163,8 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
     private fun stopAutoClickerInternal() {
         isRunning = false
+        isUserTouchActive = false
+        userTouchResumeAtMs = 0L
         clickHandler.removeCallbacks(clickRunnable)
         hideMoveHandleInternal()
         setOverlayTouchable(true)
@@ -488,7 +499,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     private fun createControlBackground(running: Boolean): GradientDrawable {
         return GradientDrawable().apply {
             cornerRadius = dp(10).toFloat()
-            setColor(if (running) Color.rgb(185, 28, 28) else Color.rgb(22, 163, 74))
+            setColor(if (running) Color.rgb(22, 163, 74) else Color.rgb(185, 28, 28))
             setStroke(dp(1), Color.WHITE)
         }
     }
@@ -561,7 +572,23 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Event inspection is not required for gesture dispatch.
+        if (!isRunning || gestureInProgress) {
+            return
+        }
+
+        when (event?.eventType) {
+            AccessibilityEvent.TYPE_TOUCH_INTERACTION_START -> {
+                isUserTouchActive = true
+            }
+
+            AccessibilityEvent.TYPE_TOUCH_INTERACTION_END -> {
+                if (isUserTouchActive) {
+                    isUserTouchActive = false
+                    userTouchResumeAtMs =
+                        SystemClock.uptimeMillis() + USER_TOUCH_RESUME_DELAY_MS
+                }
+            }
+        }
     }
 
     override fun onInterrupt() {
