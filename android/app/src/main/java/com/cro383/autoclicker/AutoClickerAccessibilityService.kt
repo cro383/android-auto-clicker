@@ -26,7 +26,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         private const val TAG = "AutoClickerService"
         private const val MIN_INTERVAL_MS = 100L
         private const val MAX_INTERVAL_MS = 5_000L
-        private const val USER_TOUCH_RESUME_DELAY_MS = 500L
+        private const val USER_TOUCH_PAUSE_MS = 1_000L
         private const val PREFERENCES_NAME = "auto_clicker_native"
         private const val KEY_TARGET_X = "target_x"
         private const val KEY_TARGET_Y = "target_y"
@@ -56,7 +56,6 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     private var clickCount = 0
     private var isDraggingTarget = false
     private var gestureInProgress = false
-    private var isUserTouchActive = false
     private var userTouchResumeAtMs = 0L
     private var overlayView: View? = null
     private var overlayLayoutParams: WindowManager.LayoutParams? = null
@@ -77,7 +76,6 @@ class AutoClickerAccessibilityService : AccessibilityService() {
             if (
                 !isDraggingTarget &&
                 !gestureInProgress &&
-                !isUserTouchActive &&
                 SystemClock.uptimeMillis() >= userTouchResumeAtMs
             ) {
                 dispatchTap(targetX, targetY)
@@ -163,7 +161,6 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
     private fun stopAutoClickerInternal() {
         isRunning = false
-        isUserTouchActive = false
         userTouchResumeAtMs = 0L
         clickHandler.removeCallbacks(clickRunnable)
         hideMoveHandleInternal()
@@ -463,6 +460,16 @@ class AutoClickerAccessibilityService : AccessibilityService() {
                     startAutoClicker()
                 }
             }
+            setOnTouchListener { _, event ->
+                if (
+                    event.actionMasked == MotionEvent.ACTION_OUTSIDE &&
+                    isRunning &&
+                    !gestureInProgress
+                ) {
+                    userTouchResumeAtMs = SystemClock.uptimeMillis() + USER_TOUCH_PAUSE_MS
+                }
+                false
+            }
         }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -472,7 +479,9 @@ class AutoClickerAccessibilityService : AccessibilityService() {
             } else {
                 WindowManager.LayoutParams.TYPE_PHONE
             },
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.END
@@ -572,23 +581,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (!isRunning || gestureInProgress) {
-            return
-        }
-
-        when (event?.eventType) {
-            AccessibilityEvent.TYPE_TOUCH_INTERACTION_START -> {
-                isUserTouchActive = true
-            }
-
-            AccessibilityEvent.TYPE_TOUCH_INTERACTION_END -> {
-                if (isUserTouchActive) {
-                    isUserTouchActive = false
-                    userTouchResumeAtMs =
-                        SystemClock.uptimeMillis() + USER_TOUCH_RESUME_DELAY_MS
-                }
-            }
-        }
+        // Event inspection is not required for gesture dispatch.
     }
 
     override fun onInterrupt() {
