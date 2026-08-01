@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { OrbitingBorderGlow } from '@/components/orbiting-border-glow';
+
 import {
   MAX_INTERVAL_MS,
   MIN_INTERVAL_MS,
@@ -57,10 +59,16 @@ export function AutoClickPanel({
           <Text style={styles.buttonText}>정지</Text>
         </Pressable>
         <Pressable
-          style={[styles.button, styles.stopButton, !isRunning && styles.buttonDisabled]}
+          style={[
+            styles.button,
+            styles.stopButton,
+            isRunning && styles.runningButtonEffect,
+            !isRunning && styles.buttonDisabled,
+          ]}
           onPress={stop}
           disabled={!isRunning}>
-          <Text style={styles.buttonText}>시작</Text>
+          <OrbitingBorderGlow active={isRunning} />
+          <Text style={styles.buttonText}>작동중</Text>
         </Pressable>
       </View>
     </View>
@@ -142,6 +150,15 @@ const styles = StyleSheet.create({
   },
   stopButton: {
     backgroundColor: '#16a34a',
+  },
+  runningButtonEffect: {
+    borderWidth: 2,
+    borderColor: '#86efac',
+    shadowColor: '#4ade80',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    elevation: 8,
   },
   buttonDisabled: {
     opacity: 0.45,

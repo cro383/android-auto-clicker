@@ -2,9 +2,14 @@ package com.cro383.autoclicker
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.animation.ValueAnimator
+import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.content.res.Configuration
 import android.os.Build
@@ -446,13 +451,15 @@ class AutoClickerAccessibilityService : AccessibilityService() {
             return
         }
 
-        val control = TextView(this).apply {
-            text = if (isRunning) "시작" else "정지"
+        val control = OrbitingControlView(this).apply {
+            text = if (isRunning) "작동중" else "정지"
             setTextColor(Color.WHITE)
             textSize = 15f
             gravity = Gravity.CENTER
             setPadding(dp(18), 0, dp(18), 0)
             background = createControlBackground(isRunning)
+            elevation = if (isRunning) dp(8).toFloat() else 0f
+            setRunning(isRunning)
             setOnClickListener {
                 if (isRunning) {
                     stopAutoClicker()
@@ -500,8 +507,10 @@ class AutoClickerAccessibilityService : AccessibilityService() {
 
     private fun updateControlButton() {
         controlView?.apply {
-            text = if (isRunning) "시작" else "정지"
+            text = if (isRunning) "작동중" else "정지"
             background = createControlBackground(isRunning)
+            elevation = if (isRunning) dp(8).toFloat() else 0f
+            (this as? OrbitingControlView)?.setRunning(isRunning)
         }
     }
 
@@ -509,7 +518,88 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         return GradientDrawable().apply {
             cornerRadius = dp(10).toFloat()
             setColor(if (running) Color.rgb(22, 163, 74) else Color.rgb(185, 28, 28))
-            setStroke(dp(1), Color.WHITE)
+            setStroke(
+                if (running) dp(2) else 0,
+                if (running) Color.rgb(134, 239, 172) else Color.TRANSPARENT,
+            )
+        }
+    }
+
+    private class OrbitingControlView(context: Context) : TextView(context) {
+        private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(220, 252, 231)
+            setShadowLayer(14f, 0f, 0f, Color.rgb(74, 222, 128))
+        }
+        private val orbitBounds = RectF()
+        private var progress = 0f
+        private var animator: ValueAnimator? = null
+
+        init {
+            setLayerType(LAYER_TYPE_SOFTWARE, null)
+        }
+
+        fun setRunning(running: Boolean) {
+            animator?.cancel()
+            animator = null
+            progress = 0f
+
+            if (running) {
+                animator = ValueAnimator.ofFloat(0f, 1f).apply {
+                    duration = 1_600L
+                    repeatCount = ValueAnimator.INFINITE
+                    addUpdateListener {
+                        progress = it.animatedValue as Float
+                        invalidate()
+                    }
+                    start()
+                }
+            } else {
+                invalidate()
+            }
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            if (animator == null) return
+
+            val radius = 6f * resources.displayMetrics.density
+            orbitBounds.set(radius, radius, width - radius, height - radius)
+            val horizontal = orbitBounds.width()
+            val vertical = orbitBounds.height()
+            val perimeter = 2f * (horizontal + vertical)
+            var distance = progress * perimeter
+            val x: Float
+            val y: Float
+
+            when {
+                distance <= horizontal -> {
+                    x = orbitBounds.left + distance
+                    y = orbitBounds.top
+                }
+                distance <= horizontal + vertical -> {
+                    distance -= horizontal
+                    x = orbitBounds.right
+                    y = orbitBounds.top + distance
+                }
+                distance <= horizontal * 2f + vertical -> {
+                    distance -= horizontal + vertical
+                    x = orbitBounds.right - distance
+                    y = orbitBounds.bottom
+                }
+                else -> {
+                    distance -= horizontal * 2f + vertical
+                    x = orbitBounds.left
+                    y = orbitBounds.bottom - distance
+                }
+            }
+
+            canvas.drawCircle(x, y, radius, glowPaint)
+        }
+
+        override fun onDetachedFromWindow() {
+            animator?.cancel()
+            animator = null
+            super.onDetachedFromWindow()
         }
     }
 
