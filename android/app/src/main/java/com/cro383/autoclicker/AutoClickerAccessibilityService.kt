@@ -51,7 +51,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     }
 
     private val clickHandler = Handler(Looper.getMainLooper())
-    private var clickIntervalMs = 1_000L
+    private var clickIntervalMs = MIN_INTERVAL_MS
     private var targetX = 0
     private var targetY = 0
     @Volatile

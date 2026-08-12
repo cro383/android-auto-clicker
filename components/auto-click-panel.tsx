@@ -2,11 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { OrbitingBorderGlow } from '@/components/orbiting-border-glow';
 
-import {
-  MAX_INTERVAL_MS,
-  MIN_INTERVAL_MS,
-  type AutoClickEngine,
-} from '@/hooks/use-auto-click-engine';
+import { type AutoClickEngine } from '@/hooks/use-auto-click-engine';
 
 export function AutoClickPanel({
   isRunning,
@@ -14,13 +10,7 @@ export function AutoClickPanel({
   intervalMs,
   start,
   stop,
-  decreaseInterval,
-  increaseInterval,
 }: AutoClickEngine) {
-
-  const atMinInterval = intervalMs <= MIN_INTERVAL_MS;
-  const atMaxInterval = intervalMs >= MAX_INTERVAL_MS;
-
   return (
     <View style={styles.panel}>
       <Text style={styles.statusText}>
@@ -31,26 +21,6 @@ export function AutoClickPanel({
       </Text>
       <Text style={styles.countText}>Click Count: {clickCount}</Text>
       <Text style={styles.intervalLabel}>Interval: {intervalMs} ms</Text>
-      <View style={styles.intervalRow}>
-        <Pressable
-          style={[
-            styles.intervalButton,
-            (isRunning || atMinInterval) && styles.buttonDisabled,
-          ]}
-          onPress={decreaseInterval}
-          disabled={isRunning || atMinInterval}>
-          <Text style={styles.intervalButtonText}>-</Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.intervalButton,
-            (isRunning || atMaxInterval) && styles.buttonDisabled,
-          ]}
-          onPress={increaseInterval}
-          disabled={isRunning || atMaxInterval}>
-          <Text style={styles.intervalButtonText}>+</Text>
-        </Pressable>
-      </View>
       <View style={styles.buttonRow}>
         <Pressable
           style={[styles.button, styles.startButton, isRunning && styles.buttonDisabled]}
@@ -110,28 +80,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
     textAlign: 'center',
-    marginBottom: 12,
-    fontVariant: ['tabular-nums'],
-  },
-  intervalRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
     marginBottom: 16,
-  },
-  intervalButton: {
-    width: 56,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: '#2563eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  intervalButtonText: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '600',
-    lineHeight: 32,
+    fontVariant: ['tabular-nums'],
   },
   buttonRow: {
     flexDirection: 'row',

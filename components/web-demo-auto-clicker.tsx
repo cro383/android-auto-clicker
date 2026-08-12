@@ -10,11 +10,7 @@ import {
 
 import { ClickRipple } from '@/components/click-ripple';
 import { OrbitingBorderGlow } from '@/components/orbiting-border-glow';
-import {
-  MAX_INTERVAL_MS,
-  MIN_INTERVAL_MS,
-  type AutoClickEngine,
-} from '@/hooks/use-auto-click-engine';
+import { type AutoClickEngine } from '@/hooks/use-auto-click-engine';
 
 const TARGET_SIZE = 80;
 const INITIAL_TARGET = { x: 320, y: 170 };
@@ -48,8 +44,6 @@ export function WebDemoAutoClicker({
   intervalMs,
   start,
   stop,
-  decreaseInterval,
-  increaseInterval,
 }: WebDemoAutoClickerProps) {
   const [stageSize, setStageSize] = useState<StageSize>({ width: 720, height: 420 });
   const [targetPosition, setTargetPosition] = useState<Point>(INITIAL_TARGET);
@@ -59,9 +53,6 @@ export function WebDemoAutoClicker({
   const targetRef = useRef(targetPosition);
   stageSizeRef.current = stageSize;
   targetRef.current = targetPosition;
-
-  const atMinInterval = intervalMs <= MIN_INTERVAL_MS;
-  const atMaxInterval = intervalMs >= MAX_INTERVAL_MS;
 
   const onStageLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -166,27 +157,6 @@ export function WebDemoAutoClicker({
                 <Text style={styles.metricLabel}>Interval</Text>
                 <Text style={styles.metricValue}>{intervalMs} ms</Text>
               </View>
-            </View>
-
-            <View style={styles.intervalRow}>
-              <Pressable
-                style={[
-                  styles.iconButton,
-                  (isRunning || atMinInterval) && styles.buttonDisabled,
-                ]}
-                onPress={decreaseInterval}
-                disabled={isRunning || atMinInterval}>
-                <Text style={styles.iconButtonText}>-</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.iconButton,
-                  (isRunning || atMaxInterval) && styles.buttonDisabled,
-                ]}
-                onPress={increaseInterval}
-                disabled={isRunning || atMaxInterval}>
-                <Text style={styles.iconButtonText}>+</Text>
-              </Pressable>
             </View>
 
             <View style={styles.actionRow}>
@@ -389,25 +359,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
-  },
-  intervalRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 14,
-  },
-  iconButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#2563eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconButtonText: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '800',
-    lineHeight: 30,
   },
   actionRow: {
     flexDirection: 'row',

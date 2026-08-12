@@ -56,6 +56,31 @@ https://github.com/cro383/android-auto-clicker
 
 Git is the single source of truth. When switching computers, pull the latest changes, install dependencies if needed, start Expo with a clean cache, and test on Android.
 
+### Local Android Device Connection
+
+These settings apply only to this project workspace.
+
+- Android SDK: `C:\Users\home\AppData\Local\Android\Sdk`
+- ADB executable: `C:\Users\home\AppData\Local\Android\Sdk\platform-tools\adb.exe`
+- Primary test device ID: `R3CWA0L9A3D`
+- Primary test device model: Samsung `SM-S916N`
+
+`adb` is not currently available through `PATH`, so invoke it with the full path above. In a restricted execution environment, access to the SDK under `AppData` can be denied and may incorrectly appear as though the SDK does not exist. Before suggesting that the SDK be reinstalled, retry the full ADB path with the required filesystem or sandbox approval.
+
+Check the device connection with:
+
+```powershell
+& 'C:\Users\home\AppData\Local\Android\Sdk\platform-tools\adb.exe' devices -l
+```
+
+Install an APK with:
+
+```powershell
+& 'C:\Users\home\AppData\Local\Android\Sdk\platform-tools\adb.exe' -s R3CWA0L9A3D install -r '<absolute-apk-path>'
+```
+
+If the device is listed as `unauthorized`, unlock the phone and approve the USB debugging prompt before retrying. For standalone testing without Metro, install the release APK containing `assets/index.android.bundle`; a debug APK requires Metro on port `8081` and can otherwise remain on the splash screen.
+
 ## Expo SDK 54 Notes
 
 Before writing code, read the exact versioned Expo docs:

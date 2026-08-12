@@ -3,11 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AutoClickerNative } from '@/lib/auto-clicker-native';
 
-export const DEFAULT_INTERVAL_MS = 1000;
+export const DEFAULT_INTERVAL_MS = 100;
 export const MIN_INTERVAL_MS = 100;
 export const MAX_INTERVAL_MS = 5000;
 export const INTERVAL_STEP_MS = 100;
 const INTERVAL_STORAGE_KEY = 'auto-clicker/interval-ms';
+const INTERVAL_ADJUSTMENT_ENABLED = false;
 
 export function useAutoClickEngine() {
   const [isRunning, setIsRunning] = useState(false);
@@ -46,6 +47,11 @@ export function useAutoClickEngine() {
   }, []);
 
   useEffect(() => {
+    if (!INTERVAL_ADJUSTMENT_ENABLED) {
+      intervalLoadedRef.current = true;
+      return;
+    }
+
     void AsyncStorage.getItem(INTERVAL_STORAGE_KEY)
       .then((stored) => {
         const parsed = Number(stored);
@@ -62,7 +68,7 @@ export function useAutoClickEngine() {
   }, []);
 
   useEffect(() => {
-    if (intervalLoadedRef.current) {
+    if (INTERVAL_ADJUSTMENT_ENABLED && intervalLoadedRef.current) {
       void AsyncStorage.setItem(INTERVAL_STORAGE_KEY, String(intervalMs));
     }
   }, [intervalMs]);
